@@ -1,0 +1,51 @@
+{-# STDLIB_VERSION 7 #-}
+{-# CONTENT_TYPE DAPP #-}
+{-# SCRIPT_TYPE ACCOUNT #-}
+
+@Callable(i)
+func publish(res: ByteVector, pool: String) = {
+  let poolAddr = addressFromStringValue(pool)
+  let actIdL = toInt(res)
+  let actId_ = drop(res, 8)
+  let relayerL = toInt(actId_, actIdL)
+  let relayer_ = drop(actId_, actIdL + 8)
+  let relayer = take(relayer_, relayerL)
+  if relayer != i.caller.bytes
+    then throw("relayer")
+    else {
+      let data_ = drop(relayer_, relayerL)
+      let time = toInt(data_)
+      let actId = take(actId_, actIdL)
+      let key = toBase58String(actId) + ":" + pool
+      let newer =
+        match getBinary(key) {
+          case oldData: ByteVector => {
+            let oldTime = toInt(oldData)
+            time > oldTime
+          }
+          case _ => true
+        }
+      if !newer
+        then throw("old")
+        else {
+          let valL = toInt(data_, 16)
+          let sigL = toInt(data_, 24 + valL)
+          let sig_ = drop(data_, 32 + valL)
+          let msg = take(res, 8 + actIdL + 8 + relayerL + 24 + valL)
+          let sig = take(sig_, sigL)
+          let pubKey = ecrecover(keccak256_16Kb(msg), sig)
+          strict inPool = invoke(poolAddr, "isInPool", [pubKey], [])
+          let isInPool =
+            match inPool {
+              case b: Boolean => b
+              case _          => false
+            }
+          if !isInPool
+            then throw("pool")
+            else {
+                let data = take(data_, 24 + valL)
+                [BinaryEntry(key, data)]
+            }
+        }
+    }
+}
