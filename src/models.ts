@@ -17,6 +17,10 @@ const ANY_TD_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 type HttpMethodName = keyof typeof HTTP_METHODS;
 
+export function isHttpMethod(value: string): value is HttpMethodName {
+  return HTTP_METHODS[value as HttpMethodName] !== undefined;
+}
+
 const enc = (() => {
   const i64 = (n: number | bigint): Buffer => {
     const b = Buffer.allocUnsafe(8);
@@ -433,6 +437,7 @@ export {
   HTTP_METHODS,
   HttpAction,
   HttpActionWithProof,
+  HttpMethodName,
   HttpPrivatePatch,
   HttpRequest,
   JsonQuexResponse,
