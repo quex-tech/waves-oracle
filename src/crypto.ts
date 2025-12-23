@@ -6,7 +6,11 @@ export function encrypt(
   recipientPubKey: Buffer,
   senderPrivKey: Uint8Array
 ): Buffer {
-  const sharedPoint = getSharedSecret(senderPrivKey, recipientPubKey, false);
+  const sharedPoint = getSharedSecret(
+    senderPrivKey,
+    Buffer.concat([Buffer.from([0x04]), recipientPubKey]),
+    false
+  );
   const pubRaw = getPublicKey(senderPrivKey, false);
   const hkdfInput = Buffer.concat([pubRaw, sharedPoint]);
   const symmKey = Buffer.from(

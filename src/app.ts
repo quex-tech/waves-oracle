@@ -11,6 +11,15 @@ import { base58Decode } from "@waves/ts-lib-crypto";
 import { handleTx } from "./utils.js";
 import { chainId } from "./network.js";
 import { keygen } from "@noble/secp256k1";
+import { parseArgs } from "node:util";
+
+const { values } = parseArgs({
+  options: {
+    apply: {
+      type: "boolean",
+    },
+  },
+});
 
 const action = new UnencryptedHttpAction(
   HttpRequest.fromParts(
@@ -53,5 +62,5 @@ await handleTx(
     },
     treasury.seed
   ),
-  false
+  Boolean(values.apply)
 );

@@ -38,7 +38,7 @@ class SignerClient {
         `Failed to get signer's public key: ${res.status} ${res.statusText}`
       );
     }
-    return Buffer.concat([Buffer.from([0x04]), hexToBuffer(await res.text())]);
+    return hexToBuffer(await res.text());
   }
 
   async address(): Promise<string> {
