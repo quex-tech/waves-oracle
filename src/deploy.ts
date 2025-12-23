@@ -2,15 +2,20 @@ import {
   treasury,
   oracles as oraclesWallet,
   responses as responsesWallet,
+  Wallet,
 } from "./wallets.js";
 import {
   oracles as oraclesScript,
   responses as responsesScript,
 } from "./scripts.js";
 import { transfer, setScript } from "@waves/waves-transactions";
-import { chainId } from "./network.js";
+import {
+  balance,
+  scriptInfo,
+} from "@waves/waves-transactions/dist/nodeInteraction.js";
+import { chainId, nodeUrl } from "./network.js";
 import { parseArgs } from "node:util";
-import { handleTx } from "./utils.js";
+import { handleTx, removePrefix } from "./utils.js";
 
 const { values } = parseArgs({
   options: {
@@ -20,60 +25,51 @@ const { values } = parseArgs({
   },
 });
 
-await handleTx(
-  transfer(
-    {
-      recipient: oraclesWallet.address,
-      amount: setScript(
+const wvs = 10 ** 8;
+
+await fund(oraclesWallet.address, 0.02 * wvs, 0.005 * wvs);
+await fund(responsesWallet.address, 0.01 * wvs, 0.0025 * wvs);
+
+await deployScript(oraclesWallet, oraclesScript);
+await deployScript(responsesWallet, responsesScript);
+
+async function fund(address: string, amount: number, ifLess: number) {
+  const oracleBalance = await balance(address, nodeUrl);
+  if (oracleBalance < ifLess) {
+    await handleTx(
+      transfer(
         {
-          script: oraclesScript,
+          recipient: address,
+          amount: amount,
           chainId: chainId,
         },
-        oraclesWallet.seed
-      ).fee,
-      chainId: chainId,
-    },
-    treasury.seed
-  ),
-  Boolean(values.apply)
-);
+        treasury.seed
+      ),
+      Boolean(values.apply)
+    );
+  }
+}
 
-await handleTx(
-  setScript(
-    {
-      script: oraclesScript,
-      chainId: chainId,
-    },
-    oraclesWallet.seed
-  ),
-  Boolean(values.apply)
-);
+async function deployScript(wallet: Wallet, script: string) {
+  const info = (await scriptInfo(wallet.address, nodeUrl)) as {
+    script?: string;
+  };
 
-await handleTx(
-  transfer(
-    {
-      recipient: responsesWallet.address,
-      amount: setScript(
-        {
-          script: responsesScript,
-          chainId: chainId,
-        },
-        responsesWallet.seed
-      ).fee,
-      chainId: chainId,
-    },
-    treasury.seed
-  ),
-  Boolean(values.apply)
-);
+  if (
+    removePrefix(info.script ?? "", "base64:") ===
+    removePrefix(script, "base64:")
+  ) {
+    return;
+  }
 
-await handleTx(
-  setScript(
-    {
-      script: responsesScript,
-      chainId: chainId,
-    },
-    responsesWallet.seed
-  ),
-  Boolean(values.apply)
-);
+  await handleTx(
+    setScript(
+      {
+        script: script,
+        chainId: chainId,
+      },
+      wallet.seed
+    ),
+    Boolean(values.apply)
+  );
+}

@@ -33,4 +33,4 @@ async function handleTx(
   console.log("Transaction confirmed.");
 }
 
-export { hexToBuffer, getEnvVar, handleTx };
+export { hexToBuffer, getEnvVar, handleTx, removePrefix };
