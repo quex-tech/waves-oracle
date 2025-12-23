@@ -13,9 +13,11 @@ import { handleTx } from "./utils.js";
 import { chainId } from "./network.js";
 import { keygen } from "@noble/secp256k1";
 import { parseArgs } from "node:util";
+import fs from "fs";
 
 type Arguments = {
-  action: UnencryptedHttpAction;
+  action: UnencryptedHttpAction | Buffer;
+  saveAction: string | null;
   oracleUrl: string;
   pool: string;
   apply: boolean;
@@ -42,9 +44,19 @@ const signerClient = new SignerClient(args.oracleUrl);
 const tdPublicKey = await signerClient.publicKey();
 const senderPrivKey = keygen().secretKey;
 
-const actionWithProof = args.action
-  .encrypt(tdPublicKey, await signerClient.address(), senderPrivKey)
-  .addProof(tdPublicKey, senderPrivKey);
+const actionWithProof = Buffer.isBuffer(args.action)
+  ? args.action
+  : args.action
+      .encrypt(tdPublicKey, await signerClient.address(), senderPrivKey)
+      .addProof(tdPublicKey, senderPrivKey);
+
+const encodedAction = (
+  Buffer.isBuffer(actionWithProof) ? actionWithProof : actionWithProof.toBytes()
+).toString("base64");
+
+if (args.saveAction) {
+  fs.writeFileSync(args.saveAction, encodedAction);
+}
 
 const res = await signerClient.query(
   actionWithProof,
@@ -101,6 +113,12 @@ function parseArguments(): Arguments | null {
         short: "f",
         default: ".",
       },
+      "output-request": {
+        type: "string",
+      },
+      "from-file": {
+        type: "string",
+      },
       "oracle-url": {
         type: "string",
         default: process.env["ORACLE_URL"],
@@ -128,29 +146,35 @@ function parseArguments(): Arguments | null {
     throw new Error(`Unsupported HTTP method: ${values.request}`);
   }
 
-  if (!positionals[0]) {
-    throw new Error("URL is reqiured");
+  let action: UnencryptedHttpAction | Buffer;
+  if (values["from-file"]) {
+    action = Buffer.from(
+      fs.readFileSync(values["from-file"], { encoding: "utf-8" }),
+      "base64"
+    );
+  } else {
+    if (!positionals[0]) {
+      throw new Error("URL is reqiured");
+    }
+    if (!positionals[1]) {
+      throw new Error("Schema is reqiured");
+    }
+    action = new UnencryptedHttpAction(
+      HttpRequest.fromParts(
+        values.request,
+        positionals[0],
+        values.header || [],
+        values.data || ""
+      ),
+      UnencryptedHttpPrivatePatch.fromParts(
+        values["enc-url-suffix"] || null,
+        values["enc-header"] || null,
+        values["enc-data"] || null
+      ),
+      positionals[1],
+      values.filter
+    );
   }
-
-  if (!positionals[1]) {
-    throw new Error("Schema is reqiured");
-  }
-
-  const action = new UnencryptedHttpAction(
-    HttpRequest.fromParts(
-      values.request,
-      positionals[0],
-      values["enc-header"] || [],
-      values.data || ""
-    ),
-    UnencryptedHttpPrivatePatch.fromParts(
-      values["enc-url-suffix"] || null,
-      values["enc-header"] || null,
-      values["enc-data"] || null
-    ),
-    positionals[1],
-    values.filter
-  );
 
   if (!values["oracle-url"]) {
     throw new Error("--oracle-url is reqiured");
@@ -158,6 +182,7 @@ function parseArguments(): Arguments | null {
 
   return {
     action: action,
+    saveAction: values["output-request"] || null,
     oracleUrl: values["oracle-url"],
     pool: values.pool,
     apply: Boolean(values.apply),
@@ -165,7 +190,9 @@ function parseArguments(): Arguments | null {
 }
 
 function printHelp() {
-  console.log(`Usage: ${process.argv[0]} ${process.argv[1]} [options...] <url> <schema>
+  console.log(`Usage:
+ ${process.argv[0]} ${process.argv[1]} [options...] <url> <schema>
+ ${process.argv[0]} ${process.argv[1]} --from-file <path> [options...]
  <schema>                       Schema to encode response body. Examples: "int", "(string,(int,bool[]))"
  -X, --request <method>         Specify request method to use. Default: GET
  -H, --header <header>          Pass custom header(s) to server. Example: "Content-Type: application/json"
@@ -174,6 +201,8 @@ function printHelp() {
      --enc-header <header>      Pass custom header(s) to server encrypted
      --enc-data <data>          HTTP POST data to send encrypted
  -f, --filter                   jq filter to transform response body. Default: .
+     --output-request <path>    Save base64-encoded request into a file
+     --from-file <path>         Use request from file
      --oracle-url <url>         Base URL of the oracle API
      --pool <address>           Address of the oracle pool script with isInPool method. Default: ${oracles.address}
      --apply                    Actually submit the transaction

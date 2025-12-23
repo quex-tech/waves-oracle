@@ -10,14 +10,16 @@ class SignerClient {
   constructor(private readonly url: string) {}
 
   async query(
-    action: HttpActionWithProof,
+    action: HttpActionWithProof | Buffer,
     relayer: Uint8Array
   ): Promise<QuexResponse> {
     const res = await fetch(new URL("/query", this.url), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        action: action.toBytes().toString("base64"),
+        action: (Buffer.isBuffer(action) ? action : action.toBytes()).toString(
+          "base64"
+        ),
         relayer: base16Encode(relayer),
         format: "ride",
       }),
