@@ -2,11 +2,13 @@ import {
   treasury,
   oracles as oraclesWallet,
   responses as responsesWallet,
+  requests as requestsWallet,
   Wallet,
 } from "./wallets.js";
 import {
   oracles as oraclesScript,
   responses as responsesScript,
+  requests as requestsScript,
 } from "./scripts.js";
 import { transfer, setScript } from "@waves/waves-transactions";
 import {
@@ -29,9 +31,11 @@ const wvs = 10 ** 8;
 
 await fund(oraclesWallet.address, 0.02 * wvs, 0.005 * wvs);
 await fund(responsesWallet.address, 0.01 * wvs, 0.0025 * wvs);
+await fund(requestsWallet.address, 0.01 * wvs, 0.0025 * wvs);
 
 await deployScript(oraclesWallet, oraclesScript);
 await deployScript(responsesWallet, responsesScript);
+await deployScript(requestsWallet, requestsScript);
 
 async function fund(address: string, amount: number, ifLess: number) {
   const oracleBalance = await balance(address, nodeUrl);

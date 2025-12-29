@@ -12,6 +12,7 @@ const seed = getEnvVar("SEED");
 export const treasury = deriveWallet(0);
 export const oracles = deriveWallet(1);
 export const responses = deriveWallet(2);
+export const requests = deriveWallet(3);
 
 function deriveWallet(index: number) {
   const s = seedWithNonce(seed, index);

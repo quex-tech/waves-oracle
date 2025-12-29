@@ -1,16 +1,15 @@
 import { accountData } from "@waves/waves-transactions/dist/nodeInteraction.js";
 import { responses } from "./wallets.js";
 import { nodeUrl } from "./network.js";
-import { base58Decode, base64Decode } from "@waves/ts-lib-crypto";
+import { base58Decode } from "@waves/ts-lib-crypto";
 import { DataItem } from "./models.js";
+import { parseBinaryEntry } from "./utils.js";
 
 const currentData = await accountData({ address: responses.address }, nodeUrl);
 
 for (const key of Object.keys(currentData)) {
   const [actionId, pool] = key.split(":");
-  const dataItem = DataItem.fromBytes(
-    Buffer.from(base64Decode(String(currentData[key].value).split(":")[1]))
-  );
+  const dataItem = DataItem.fromBytes(parseBinaryEntry(currentData[key]));
   console.log(
     "- Action ID:   ",
     Buffer.from(base58Decode(actionId)).toString("hex")

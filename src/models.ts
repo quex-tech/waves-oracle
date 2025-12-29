@@ -13,6 +13,10 @@ const HTTP_METHODS = {
   TRACE: 5,
 } as const;
 
+const HTTP_METHOD_NAMES = Object.entries(HTTP_METHODS)
+  .sort((a, b) => a[1] - b[1])
+  .map(([name]) => name as HttpMethodName);
+
 const ANY_TD_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 type HttpMethodName = keyof typeof HTTP_METHODS;
@@ -38,12 +42,55 @@ const enc = (() => {
   return { i64, bytes, str, list };
 })();
 
+type Reader = {
+  i64: () => number;
+  bytes: () => Buffer;
+  str: () => string;
+  list: <T>(readItem: () => T) => T[];
+};
+
+const dec = {
+  from(buf: Buffer): Reader {
+    let offset = 0;
+
+    const i64 = (): number => {
+      const value = Number(buf.readBigInt64BE(offset));
+      offset += 8;
+      return value;
+    };
+
+    const bytes = (): Buffer => {
+      const length = i64();
+      const value = buf.subarray(offset, offset + length);
+      offset += length;
+      return value;
+    };
+
+    const str = (): string => bytes().toString("utf8");
+
+    const list = <T>(readItem: () => T): T[] => {
+      const count = i64();
+      const items = new Array<T>(count);
+      for (let i = 0; i < count; i++) {
+        items[i] = readItem();
+      }
+      return items;
+    };
+
+    return { i64, bytes, str, list };
+  },
+};
+
 class RequestHeader {
   constructor(public readonly key: string, public readonly value: string) {}
 
   static fromString(str: string): RequestHeader {
-    const parts = str.split(":");
-    return new RequestHeader(parts[0].trim(), parts[1].trim());
+    const [key, value] = str.split(":");
+    return new RequestHeader(key.trim(), value.trim());
+  }
+
+  static fromReader(reader: Reader) {
+    return new RequestHeader(reader.str(), reader.str());
   }
 
   toBytes(): Buffer {
@@ -53,6 +100,10 @@ class RequestHeader {
 
 class QueryParameter {
   constructor(public readonly key: string, public readonly value: string) {}
+
+  static fromReader(reader: Reader) {
+    return new QueryParameter(reader.str(), reader.str());
+  }
 
   toBytes(): Buffer {
     return Buffer.concat([enc.str(this.key), enc.str(this.value)]);
@@ -89,6 +140,17 @@ class HttpRequest {
     );
   }
 
+  static fromReader(reader: Reader) {
+    return new HttpRequest(
+      HTTP_METHOD_NAMES[reader.i64()],
+      reader.str(),
+      reader.str(),
+      reader.list(() => RequestHeader.fromReader(reader)),
+      reader.list(() => QueryParameter.fromReader(reader)),
+      reader.str()
+    );
+  }
+
   toBytes(): Buffer {
     return Buffer.concat([
       enc.i64(HTTP_METHODS[this.method]),
@@ -98,6 +160,23 @@ class HttpRequest {
       enc.list(this.parameters.map((p) => p.toBytes())),
       enc.str(this.body),
     ]);
+  }
+
+  formatMethodAndUrl(): string {
+    const baseUrl = `https://${this.host}${this.path}`;
+    const params = this.parameters;
+    if (params.length === 0) {
+      return `${this.method} ${baseUrl}`;
+    }
+    let query = "";
+    for (let i = 0; i < params.length; i++) {
+      const param = params[i];
+      if (i > 0) query += "&";
+      query += `${encodeURIComponent(param.key)}=${encodeURIComponent(
+        param.value
+      )}`;
+    }
+    return `${this.method} ${baseUrl}?${query}`;
   }
 }
 
@@ -110,6 +189,10 @@ class RequestHeaderPatch {
   toBytes(): Buffer {
     return Buffer.concat([enc.str(this.key), enc.bytes(this.ciphertext)]);
   }
+
+  static fromReader(reader: Reader) {
+    return new RequestHeaderPatch(reader.str(), reader.bytes());
+  }
 }
 
 class QueryParameterPatch {
@@ -120,6 +203,10 @@ class QueryParameterPatch {
 
   toBytes(): Buffer {
     return Buffer.concat([enc.str(this.key), enc.bytes(this.ciphertext)]);
+  }
+
+  static fromReader(reader: Reader) {
+    return new QueryParameterPatch(reader.str(), reader.bytes());
   }
 }
 
@@ -139,6 +226,16 @@ class HttpPrivatePatch {
       [],
       Buffer.alloc(0),
       ANY_TD_ADDRESS
+    );
+  }
+
+  static fromReader(reader: Reader) {
+    return new HttpPrivatePatch(
+      reader.bytes(),
+      reader.list(() => RequestHeaderPatch.fromReader(reader)),
+      reader.list(() => QueryParameterPatch.fromReader(reader)),
+      reader.bytes(),
+      reader.str()
     );
   }
 
@@ -285,6 +382,19 @@ class HttpAction {
     public readonly filter: string
   ) {}
 
+  static fromReader(reader: Reader) {
+    return new HttpAction(
+      HttpRequest.fromReader(reader),
+      HttpPrivatePatch.fromReader(reader),
+      reader.str(),
+      reader.str()
+    );
+  }
+
+  static fromBytes(buf: Buffer) {
+    return this.fromReader(dec.from(buf));
+  }
+
   toBytes(): Buffer {
     return Buffer.concat([
       this.request.toBytes(),
@@ -325,6 +435,17 @@ class HttpActionWithProof {
     public readonly action: HttpAction,
     public readonly proof: Buffer
   ) {}
+
+  static fromReader(reader: Reader) {
+    return new HttpActionWithProof(
+      HttpAction.fromReader(reader),
+      reader.bytes()
+    );
+  }
+
+  static fromBytes(buf: Buffer) {
+    return this.fromReader(dec.from(buf));
+  }
 
   toBytes(): Buffer {
     return Buffer.concat([this.action.toBytes(), enc.bytes(this.proof)]);
@@ -370,11 +491,11 @@ class DataItem {
   }
 
   static fromBytes(buf: Buffer): DataItem {
-    return new DataItem(
-      Number(buf.readBigInt64BE()),
-      Number(buf.readBigInt64BE(8)),
-      buf.subarray(24, 24 + Number(buf.readBigInt64BE(16)))
-    );
+    return this.fromReader(dec.from(buf));
+  }
+
+  static fromReader(reader: Reader) {
+    return new DataItem(reader.i64(), reader.i64(), reader.bytes());
   }
 
   toBytes(): Buffer {
