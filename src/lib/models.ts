@@ -1,8 +1,8 @@
-import { URL } from "node:url";
-import { keccak } from "@waves/ts-lib-crypto";
-import { hexToBuffer } from "./utils.js";
-import { encrypt } from "./crypto.js";
 import { getPublicKey } from "@noble/secp256k1";
+import { keccak } from "@waves/ts-lib-crypto";
+import { URL } from "node:url";
+import { encrypt } from "./crypto.js";
+import { hexToBuffer } from "./utils.js";
 
 const HTTP_METHODS = {
   GET: 0,
@@ -82,7 +82,10 @@ const dec = {
 };
 
 class RequestHeader {
-  constructor(public readonly key: string, public readonly value: string) {}
+  constructor(
+    public readonly key: string,
+    public readonly value: string,
+  ) {}
 
   static fromString(str: string): RequestHeader {
     const [key, value] = str.split(":");
@@ -99,7 +102,10 @@ class RequestHeader {
 }
 
 class QueryParameter {
-  constructor(public readonly key: string, public readonly value: string) {}
+  constructor(
+    public readonly key: string,
+    public readonly value: string,
+  ) {}
 
   static fromReader(reader: Reader) {
     return new QueryParameter(reader.str(), reader.str());
@@ -117,14 +123,14 @@ class HttpRequest {
     public readonly path: string,
     public readonly headers: RequestHeader[],
     public readonly parameters: QueryParameter[],
-    public readonly body: string
+    public readonly body: string,
   ) {}
 
   static fromParts(
     method: HttpMethodName,
     url: string,
     headers: string[],
-    body: string
+    body: string,
   ) {
     const parsedUrl = new URL(url);
     return new HttpRequest(
@@ -134,9 +140,9 @@ class HttpRequest {
       headers.map((header) => RequestHeader.fromString(header)),
       Array.from(
         parsedUrl.searchParams,
-        ([key, value]) => new QueryParameter(key, value)
+        ([key, value]) => new QueryParameter(key, value),
       ),
-      body
+      body,
     );
   }
 
@@ -147,7 +153,7 @@ class HttpRequest {
       reader.str(),
       reader.list(() => RequestHeader.fromReader(reader)),
       reader.list(() => QueryParameter.fromReader(reader)),
-      reader.str()
+      reader.str(),
     );
   }
 
@@ -173,7 +179,7 @@ class HttpRequest {
       const param = params[i];
       if (i > 0) query += "&";
       query += `${encodeURIComponent(param.key)}=${encodeURIComponent(
-        param.value
+        param.value,
       )}`;
     }
     return `${this.method} ${baseUrl}?${query}`;
@@ -183,7 +189,7 @@ class HttpRequest {
 class RequestHeaderPatch {
   constructor(
     public readonly key: string,
-    public readonly ciphertext: Buffer
+    public readonly ciphertext: Buffer,
   ) {}
 
   toBytes(): Buffer {
@@ -198,7 +204,7 @@ class RequestHeaderPatch {
 class QueryParameterPatch {
   constructor(
     public readonly key: string,
-    public readonly ciphertext: Buffer
+    public readonly ciphertext: Buffer,
   ) {}
 
   toBytes(): Buffer {
@@ -216,7 +222,7 @@ class HttpPrivatePatch {
     public readonly headers: RequestHeaderPatch[],
     public readonly parameters: QueryParameterPatch[],
     public readonly body: Buffer,
-    public readonly tdAddress: string
+    public readonly tdAddress: string,
   ) {}
 
   static empty(): HttpPrivatePatch {
@@ -225,7 +231,7 @@ class HttpPrivatePatch {
       [],
       [],
       Buffer.alloc(0),
-      ANY_TD_ADDRESS
+      ANY_TD_ADDRESS,
     );
   }
 
@@ -235,7 +241,7 @@ class HttpPrivatePatch {
       reader.list(() => RequestHeaderPatch.fromReader(reader)),
       reader.list(() => QueryParameterPatch.fromReader(reader)),
       reader.bytes(),
-      reader.str()
+      reader.str(),
     );
   }
 
@@ -264,7 +270,7 @@ class UnencryptedHttpPrivatePatch {
     public readonly pathSuffix: Buffer | null,
     public readonly headers: RequestHeader[],
     public readonly parameters: QueryParameter[],
-    public readonly body: Buffer | null
+    public readonly body: Buffer | null,
   ) {}
 
   static empty() {
@@ -272,17 +278,17 @@ class UnencryptedHttpPrivatePatch {
       Buffer.alloc(0),
       [],
       [],
-      Buffer.alloc(0)
+      Buffer.alloc(0),
     );
   }
 
   static fromParts(
     urlSuffix: string | null,
     headers: string[] | null,
-    body: string | null
+    body: string | null,
   ): UnencryptedHttpPrivatePatch {
     const parsedHeaders = (headers || []).map((header) =>
-      RequestHeader.fromString(header)
+      RequestHeader.fromString(header),
     );
 
     let pathSuffix: Buffer | null = null;
@@ -296,7 +302,7 @@ class UnencryptedHttpPrivatePatch {
       parameters = query
         ? Array.from(
             new URLSearchParams(query),
-            ([key, value]) => new QueryParameter(key, value)
+            ([key, value]) => new QueryParameter(key, value),
           )
         : [];
 
@@ -313,24 +319,27 @@ class UnencryptedHttpPrivatePatch {
       pathSuffix,
       parsedHeaders,
       parameters,
-      body != null ? Buffer.from(body, "utf8") : null
+      body != null ? Buffer.from(body, "utf8") : null,
     );
   }
 
   encrypt(
     encryptFunc: (data: Buffer) => Buffer,
-    tdAddress: string
+    tdAddress: string,
   ): HttpPrivatePatch {
     const headers = this.headers.map(
       (h) =>
-        new RequestHeaderPatch(h.key, encryptFunc(Buffer.from(h.value, "utf8")))
+        new RequestHeaderPatch(
+          h.key,
+          encryptFunc(Buffer.from(h.value, "utf8")),
+        ),
     );
     const parameters = this.parameters.map(
       (p) =>
         new QueryParameterPatch(
           p.key,
-          encryptFunc(Buffer.from(p.value, "utf8"))
-        )
+          encryptFunc(Buffer.from(p.value, "utf8")),
+        ),
     );
 
     const encryptOrEmpty = (value?: Buffer | null): Buffer =>
@@ -341,7 +350,7 @@ class UnencryptedHttpPrivatePatch {
       headers,
       parameters,
       encryptOrEmpty(this.body),
-      tdAddress
+      tdAddress,
     );
   }
 
@@ -360,7 +369,7 @@ export class UnencryptedHttpAction {
     public readonly request: HttpRequest,
     public readonly patch: UnencryptedHttpPrivatePatch,
     public readonly schema: string,
-    public readonly filter: string
+    public readonly filter: string,
   ) {}
 
   encrypt(tdPublicKey: Buffer, tdAddress: string, senderPrivKey: Uint8Array) {
@@ -368,7 +377,7 @@ export class UnencryptedHttpAction {
       ? HttpPrivatePatch.empty()
       : this.patch.encrypt(
           (x) => encrypt(x, tdPublicKey, senderPrivKey),
-          tdAddress
+          tdAddress,
         );
     return new HttpAction(this.request, patch, this.schema, this.filter);
   }
@@ -379,7 +388,7 @@ class HttpAction {
     public readonly request: HttpRequest,
     public readonly patch: HttpPrivatePatch,
     public readonly schema: string,
-    public readonly filter: string
+    public readonly filter: string,
   ) {}
 
   static fromReader(reader: Reader) {
@@ -387,7 +396,7 @@ class HttpAction {
       HttpRequest.fromReader(reader),
       HttpPrivatePatch.fromReader(reader),
       reader.str(),
-      reader.str()
+      reader.str(),
     );
   }
 
@@ -410,7 +419,7 @@ class HttpAction {
 
   addProof(
     recipientPubKey: Buffer,
-    senderPrivKey: Uint8Array
+    senderPrivKey: Uint8Array,
   ): HttpActionWithProof {
     if (this.patch.isEmpty()) {
       return this.addEmptyProof();
@@ -421,7 +430,7 @@ class HttpAction {
       Buffer.concat([
         getPublicKey(senderPrivKey, false).slice(1),
         encrypt(this.getActionId(), recipientPubKey, senderPrivKey),
-      ])
+      ]),
     );
   }
 
@@ -433,13 +442,13 @@ class HttpAction {
 class HttpActionWithProof {
   constructor(
     public readonly action: HttpAction,
-    public readonly proof: Buffer
+    public readonly proof: Buffer,
   ) {}
 
   static fromReader(reader: Reader) {
     return new HttpActionWithProof(
       HttpAction.fromReader(reader),
-      reader.bytes()
+      reader.bytes(),
     );
   }
 
@@ -479,14 +488,14 @@ class DataItem {
   constructor(
     public readonly timestamp: number,
     public readonly error: number,
-    public readonly value: Buffer
+    public readonly value: Buffer,
   ) {}
 
   static parse(json: JsonDataItem): DataItem {
     return new DataItem(
       json.timestamp,
       json.error,
-      Buffer.from(json.value, "base64")
+      Buffer.from(json.value, "base64"),
     );
   }
 
@@ -511,14 +520,14 @@ class QuexMessage {
   constructor(
     public readonly actionId: Buffer,
     public readonly dataItem: DataItem,
-    public readonly relayer: Buffer
+    public readonly relayer: Buffer,
   ) {}
 
   static parse(json: JsonQuexMessage): QuexMessage {
     return new QuexMessage(
       Buffer.from(json.action_id, "base64"),
       DataItem.parse(json.data_item),
-      hexToBuffer(json.relayer)
+      hexToBuffer(json.relayer),
     );
   }
 
@@ -534,7 +543,7 @@ class QuexMessage {
 class QuexResponse {
   constructor(
     public readonly message: QuexMessage,
-    public readonly signature: Buffer
+    public readonly signature: Buffer,
   ) {}
 
   static parse(json: JsonQuexResponse): QuexResponse {
@@ -544,7 +553,7 @@ class QuexResponse {
         Buffer.from(json.sig.r, "base64"),
         Buffer.from(json.sig.s, "base64"),
         Buffer.from([json.sig.v]),
-      ])
+      ]),
     );
   }
 
@@ -555,6 +564,7 @@ class QuexResponse {
 
 export {
   ANY_TD_ADDRESS,
+  DataItem,
   HTTP_METHODS,
   HttpAction,
   HttpActionWithProof,
@@ -567,6 +577,5 @@ export {
   QuexResponse,
   RequestHeader,
   RequestHeaderPatch,
-  DataItem,
   UnencryptedHttpPrivatePatch,
 };

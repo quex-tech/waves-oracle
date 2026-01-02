@@ -1,20 +1,20 @@
-import { randomBytes, createCipheriv, hkdfSync } from "node:crypto";
 import { getPublicKey, getSharedSecret } from "@noble/secp256k1";
+import { createCipheriv, hkdfSync, randomBytes } from "node:crypto";
 
 export function encrypt(
   message: Buffer,
   recipientPubKey: Buffer,
-  senderPrivKey: Uint8Array
+  senderPrivKey: Uint8Array,
 ): Buffer {
   const sharedPoint = getSharedSecret(
     senderPrivKey,
     Buffer.concat([Buffer.from([0x04]), recipientPubKey]),
-    false
+    false,
   );
   const pubRaw = getPublicKey(senderPrivKey, false);
   const hkdfInput = Buffer.concat([pubRaw, sharedPoint]);
   const symmKey = Buffer.from(
-    hkdfSync("sha256", hkdfInput, Buffer.alloc(0), Buffer.alloc(0), 32)
+    hkdfSync("sha256", hkdfInput, Buffer.alloc(0), Buffer.alloc(0), 32),
   );
 
   const nonce = randomBytes(16);

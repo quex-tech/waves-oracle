@@ -23,6 +23,13 @@
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",
     "eslint": "^8.57.1",
+    "prettier": "^3.6.2",
+    "prettier-plugin-organize-imports": "^3.2.4",
     "typescript": "^5.9.3"
+  },
+  "prettier": {
+    "plugins": [
+      "prettier-plugin-organize-imports"
+    ]
   }
 }

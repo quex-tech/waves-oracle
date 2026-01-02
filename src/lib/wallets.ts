@@ -1,4 +1,4 @@
-import { seedWithNonce, crypto } from "@waves/ts-lib-crypto";
+import { crypto, seedWithNonce } from "@waves/ts-lib-crypto";
 import { TSeedTypes } from "@waves/waves-transactions";
 import { chainId } from "./network.js";
 

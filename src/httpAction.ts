@@ -1,13 +1,13 @@
+import fs from "fs";
+import { parseArgs } from "node:util";
 import {
   HttpActionWithProof,
   HttpRequest,
   isHttpMethod,
   UnencryptedHttpAction,
   UnencryptedHttpPrivatePatch,
-} from "./models.js";
-import { parseArgs } from "node:util";
-import fs from "fs";
-import { asOptionalStringArg, asStringArg } from "./utils.js";
+} from "./lib/models.js";
+import { asOptionalStringArg, asStringArg } from "./lib/utils.js";
 
 export function parseHttpAction(args: string[]) {
   const { values, positionals } = parseArgs({
@@ -60,8 +60,8 @@ export function parseHttpAction(args: string[]) {
         fs.readFileSync(asStringArg(values["from-file"]), {
           encoding: "utf-8",
         }),
-        "base64"
-      )
+        "base64",
+      ),
     );
   }
 
@@ -78,14 +78,14 @@ export function parseHttpAction(args: string[]) {
       request,
       positionals[0],
       (values.header || []).map(asStringArg),
-      asOptionalStringArg(values.data) || ""
+      asOptionalStringArg(values.data) || "",
     ),
     UnencryptedHttpPrivatePatch.fromParts(
       asOptionalStringArg(values["enc-url-suffix"]) || null,
       values["enc-header"]?.map(asStringArg) || null,
-      asOptionalStringArg(values["enc-data"]) || null
+      asOptionalStringArg(values["enc-data"]) || null,
     ),
     positionals[1],
-    asStringArg(values.filter)
+    asStringArg(values.filter),
   );
 }

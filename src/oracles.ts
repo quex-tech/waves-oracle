@@ -1,11 +1,11 @@
+import { base58Decode, base58Encode } from "@waves/ts-lib-crypto";
 import { data } from "@waves/waves-transactions";
 import { accountData } from "@waves/waves-transactions/dist/nodeInteraction.js";
-import { oracles } from "./wallets.js";
-import { base58Decode, base58Encode } from "@waves/ts-lib-crypto";
 import { parseArgs } from "util";
-import { SignerClient } from "./signer.js";
-import { chainId, nodeUrl } from "./network.js";
-import { handleTx } from "./utils.js";
+import { chainId, nodeUrl } from "./lib/network.js";
+import { SignerClient } from "./lib/signer.js";
+import { handleTx } from "./lib/utils.js";
+import { oracles } from "./lib/wallets.js";
 
 const [command, ...rest] = process.argv.slice(2);
 
@@ -21,7 +21,7 @@ switch (command) {
     break;
   default:
     console.log(
-      `Usage: ${process.argv[0]} ${process.argv[1]} add|delete|list|check`
+      `Usage: ${process.argv[0]} ${process.argv[1]} add|delete|list|check`,
     );
     break;
 }
@@ -43,7 +43,7 @@ async function add(args: string[]) {
         data: [
           {
             key: base58Encode(
-              await new SignerClient(positionals[0]).publicKey()
+              await new SignerClient(positionals[0]).publicKey(),
             ),
             type: "boolean",
             value: true,
@@ -51,9 +51,9 @@ async function add(args: string[]) {
         ],
         chainId: chainId,
       },
-      oracles.seed
+      oracles.seed,
     ),
-    Boolean(values.apply)
+    Boolean(values.apply),
   );
 }
 
@@ -74,15 +74,15 @@ async function del(args: string[]) {
         data: [
           {
             key: base58Encode(
-              await new SignerClient(positionals[0]).publicKey()
+              await new SignerClient(positionals[0]).publicKey(),
             ),
           },
         ],
         chainId: chainId,
       },
-      oracles.seed
+      oracles.seed,
     ),
-    Boolean(values.apply)
+    Boolean(values.apply),
   );
 }
 
@@ -91,6 +91,6 @@ async function list() {
   console.log(
     Object.keys(currentData)
       .filter((x) => currentData[x].value)
-      .map((x) => Buffer.from(base58Decode(x)).toString("hex"))
+      .map((x) => Buffer.from(base58Decode(x)).toString("hex")),
   );
 }

@@ -1,23 +1,23 @@
-import {
-  treasury,
-  oracles as oraclesWallet,
-  responses as responsesWallet,
-  requests as requestsWallet,
-  Wallet,
-} from "./wallets.js";
-import {
-  oracles as oraclesScript,
-  responses as responsesScript,
-  requests as requestsScript,
-} from "./scripts.js";
-import { transfer, setScript } from "@waves/waves-transactions";
+import { setScript, transfer } from "@waves/waves-transactions";
 import {
   balance,
   scriptInfo,
 } from "@waves/waves-transactions/dist/nodeInteraction.js";
-import { chainId, nodeUrl } from "./network.js";
 import { parseArgs } from "node:util";
-import { handleTx, removePrefix } from "./utils.js";
+import { chainId, nodeUrl } from "./lib/network.js";
+import { handleTx, removePrefix, wvs } from "./lib/utils.js";
+import {
+  oracles as oraclesScript,
+  requests as requestsScript,
+  responses as responsesScript,
+} from "./scripts.js";
+import {
+  oracles as oraclesWallet,
+  requests as requestsWallet,
+  responses as responsesWallet,
+  treasury,
+  Wallet,
+} from "./lib/wallets.js";
 
 const { values } = parseArgs({
   options: {
@@ -26,8 +26,6 @@ const { values } = parseArgs({
     },
   },
 });
-
-const wvs = 10 ** 8;
 
 await fund(oraclesWallet.address, 0.02 * wvs, 0.005 * wvs);
 await fund(responsesWallet.address, 0.01 * wvs, 0.0025 * wvs);
@@ -47,9 +45,9 @@ async function fund(address: string, amount: number, ifLess: number) {
           amount: amount,
           chainId: chainId,
         },
-        treasury.seed
+        treasury.seed,
       ),
-      Boolean(values.apply)
+      Boolean(values.apply),
     );
   }
 }
@@ -72,8 +70,8 @@ async function deployScript(wallet: Wallet, script: string) {
         script: script,
         chainId: chainId,
       },
-      wallet.seed
+      wallet.seed,
     ),
-    Boolean(values.apply)
+    Boolean(values.apply),
   );
 }

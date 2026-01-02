@@ -1,17 +1,19 @@
-import { accountData } from "@waves/waves-transactions/dist/nodeInteraction.js";
-import { DataTransactionEntry } from "@waves/ts-types";
-import { chainId, nodeUrl } from "./network.js";
-import { requests, treasury, oracles } from "./wallets.js";
-import { base58Decode, base58Encode, base64Encode } from "@waves/ts-lib-crypto";
-import { parseHttpAction } from "./httpAction.js";
-import { SignerClient } from "./signer.js";
 import { keygen } from "@noble/secp256k1";
-import { asStringArg, handleTx, parseBinaryEntry } from "./utils.js";
+import { base58Decode, base58Encode, base64Encode } from "@waves/ts-lib-crypto";
 import { invokeScript } from "@waves/waves-transactions";
-import { HttpAction, HttpActionWithProof } from "./models.js";
 import { parseArgs } from "node:util";
-
-const wvs = 10 ** 8;
+import { parseHttpAction } from "./httpAction.js";
+import { HttpActionWithProof } from "./lib/models.js";
+import { chainId, nodeUrl } from "./lib/network.js";
+import { fetchRequests, findRequest } from "./lib/requests.js";
+import { SignerClient } from "./lib/signer.js";
+import {
+  asOptionalStringArg,
+  asStringArg,
+  handleTx,
+  wvs,
+} from "./lib/utils.js";
+import { oracles, requests, treasury } from "./lib/wallets.js";
 
 const [command, ...rest] = process.argv.slice(2);
 
@@ -30,51 +32,38 @@ switch (command) {
     break;
   default:
     console.log(
-      `Usage: ${process.argv[0]} ${process.argv[1]} list|add|recycle|fulfill`
+      `Usage: ${process.argv[0]} ${process.argv[1]} list|add|recycle|fulfill`,
     );
     break;
 }
 
 async function list() {
-  const currentData = await accountData({ address: requests.address }, nodeUrl);
-  const groupedData: Record<string, Record<string, DataTransactionEntry>> = {};
-
-  for (const k of Object.keys(currentData)) {
-    const parts = k.split(":");
-    if (parts.length !== 4) {
-      continue;
-    }
-    const [pool, actionId, txId, field] = parts;
-    (groupedData[[pool, actionId, txId].join(":")] ||= {})[field] =
-      currentData[k];
-  }
-
-  for (const k of Object.keys(groupedData)) {
-    console.log("- Key:    ", k);
-    const req = groupedData[k];
-    const action = HttpAction.fromBytes(parseBinaryEntry(req.action));
-    console.log("  Request:", action.request.formatMethodAndUrl());
-    if (action.request.headers.length) {
+  for (const req of await fetchRequests(requests.address, nodeUrl)) {
+    console.log("- Key:    ", req.key);
+    console.log("  Request:", req.action.action.request.formatMethodAndUrl());
+    if (
+      req.action.action.request.headers.length ||
+      req.action.action.patch.headers.length
+    ) {
       console.log("  Headers:");
-      for (const h of action.request.headers) {
+      for (const h of req.action.action.request.headers) {
         console.log(`  - ${h.key}: ${h.value}`);
       }
+      for (const h of req.action.action.patch.headers) {
+        console.log(`  - ${h.key}: <encrypted>`);
+      }
     }
-    if (action.request.body.length) {
-      console.log("  Body:   ", action.request.body);
+    if (req.action.action.patch.body.length) {
+      console.log("  Body:    <encrypted>");
+    } else if (req.action.action.request.body.length) {
+      console.log("  Body:   ", req.action.action.request.body);
     }
-    console.log("  Filter: ", action.filter);
-    console.log("  Schema: ", action.schema);
-    console.log(
-      "  After:  ",
-      new Date(Number(req.after.value) * 1000).toISOString()
-    );
-    console.log(
-      "  Before: ",
-      new Date(Number(req.before.value) * 1000).toISOString()
-    );
-    console.log("  Owner:  ", base58Encode(parseBinaryEntry(req.owner)));
-    console.log(`  Reward:  ${Number(req.reward.value) / wvs} WAVES`);
+    console.log("  Filter: ", req.action.action.filter);
+    console.log("  Schema: ", req.action.action.schema);
+    console.log("  After:  ", req.after.toISOString());
+    console.log("  Before: ", req.before.toISOString());
+    console.log("  Owner:  ", req.owner);
+    console.log(`  Reward:  ${req.reward / wvs} WAVES`);
   }
 }
 
@@ -100,11 +89,51 @@ async function add(rest: string[]) {
     strict: false,
   });
 
-  const action = parseHttpAction(rest);
-  const signerClient = new SignerClient(
-    asStringArg(values["oracle-url"] || "")
-  );
+  function printHelp() {
+    console.log(`Usage:
+ ${process.argv[0]} ${process.argv[1]} add [options] <url> <schema>
+ ${process.argv[0]} ${process.argv[1]} add --from-file <path> [options]
+ <schema>                       Schema to encode response body. Examples: "int", "(string,(int,bool[]))"
+ -X, --request <method>         Specify request method to use. Default: GET
+ -H, --header <header>          Pass custom header(s) to server. Example: "Content-Type: application/json"
+ -d, --data <data>              HTTP POST data
+     --enc-url-suffix <suffix>  URL suffix to append and send encrypted. Examples: /sec, ?sec=1&enc=2, /sec?enc=a
+     --enc-header <header>      Pass custom header(s) to server encrypted
+     --enc-data <data>          HTTP POST data to send encrypted
+ -f, --filter                   jq filter to transform response body. Default: .
+     --output-request <path>    Save base64-encoded request into a file
+     --from-file <path>         Use request from file
+     --oracle-url <url>         Base URL of the oracle API
+     --pool <address>           Address of the oracle pool script with isInPool method. Default: ${oracles.address}
+     --apply                    Actually submit the transaction
+ -h, --help                     Show this help message and exit`);
+  }
 
+  if (values.help) {
+    printHelp();
+    process.exit(0);
+  }
+
+  const action = (function () {
+    try {
+      return parseHttpAction(rest);
+    } catch (e) {
+      if (e instanceof Error) {
+        console.log(e.message);
+      }
+      printHelp();
+      process.exit(1);
+    }
+  })();
+
+  const oracleUrl = asOptionalStringArg(values["oracle-url"]);
+  if (!oracleUrl) {
+    console.log("--oracle-url is required");
+    printHelp();
+    process.exit(1);
+  }
+
+  const signerClient = new SignerClient(oracleUrl);
   const tdPublicKey = await signerClient.publicKey();
   const senderPrivKey = keygen().secretKey;
 
@@ -125,7 +154,7 @@ async function add(rest: string[]) {
           {
             type: "binary",
             value: Buffer.from(base58Decode(asStringArg(values.pool))).toString(
-              "base64"
+              "base64",
             ),
           },
           {
@@ -149,13 +178,13 @@ async function add(rest: string[]) {
       chainId: chainId,
       payment: [{ amount: 0.01 * wvs }],
     },
-    treasury.seed
+    treasury.seed,
   );
   await handleTx(tx, Boolean(values.apply));
   console.log(
     `Key: ${asStringArg(values.pool)}:${base58Encode(
-      actionWithProof.action.getActionId()
-    )}:${tx.id}`
+      actionWithProof.action.getActionId(),
+    )}:${tx.id}`,
   );
 }
 
@@ -166,13 +195,32 @@ async function recycle(rest: string[]) {
       apply: {
         type: "boolean",
       },
+      help: {
+        type: "boolean",
+        short: "h",
+      },
     },
     allowPositionals: true,
   });
+
+  function printHelp() {
+    console.log(
+      `Usage: ${process.argv[0]} ${process.argv[1]} recycle [options] <key>
+     --apply             Actually submit the transaction
+ -h, --help              Show this help message and exit`,
+    );
+  }
+
+  if (values.help) {
+    printHelp();
+    process.exit(0);
+  }
+
   if (!positionals[0]) {
-    console.log(`Usage: ${process.argv[0]} ${process.argv[1]} recycle <key>`);
+    printHelp();
     process.exit(1);
   }
+
   await handleTx(
     invokeScript(
       {
@@ -188,9 +236,9 @@ async function recycle(rest: string[]) {
         },
         chainId: chainId,
       },
-      treasury.seed
+      treasury.seed,
     ),
-    Boolean(values.apply)
+    Boolean(values.apply),
   );
 }
 
@@ -213,29 +261,40 @@ async function fulfill(rest: string[]) {
     allowPositionals: true,
   });
 
+  function printHelp() {
+    console.log(
+      `Usage: ${process.argv[0]} ${process.argv[1]} fulfill [options] <key>
+     --oracle-url <url>  Base URL of the oracle API
+     --apply             Actually submit the transaction
+ -h, --help              Show this help message and exit`,
+    );
+  }
+
+  if (values.help) {
+    printHelp();
+    process.exit(0);
+  }
+  if (!positionals[0]) {
+    printHelp();
+    process.exit(1);
+  }
+  const oracleUrl = values["oracle-url"];
+  if (!oracleUrl) {
+    console.log("--oracle-url is required");
+    printHelp();
+    process.exit(1);
+  }
+
   const key = positionals[0];
-  const keyParts = key.split(":");
-  const [pool, actionId, txId] = keyParts.map(base58Decode);
-  const currentData = await accountData(
-    { address: requests.address, match: `${escapeRegExp(key)}:.*` },
-    nodeUrl
-  );
-  const action = currentData[`${key}:action`];
-  const proof = currentData[`${key}:proof`];
-  if (!action || !proof) {
+  const req = await findRequest(key, requests.address, nodeUrl);
+  if (!req) {
     throw new Error("Request is not found");
   }
-  const actionWithProof = new HttpActionWithProof(
-    HttpAction.fromBytes(parseBinaryEntry(action)),
-    parseBinaryEntry(proof)
-  );
-  if (actionWithProof.action.getActionId().compare(actionId) !== 0) {
-    throw new Error("Invalid action ID");
-  }
-  const signerClient = new SignerClient(String(values["oracle-url"]));
+
+  const signerClient = new SignerClient(oracleUrl);
   const res = await signerClient.query(
-    actionWithProof,
-    base58Decode(treasury.address)
+    req.action,
+    base58Decode(treasury.address),
   );
   await handleTx(
     invokeScript(
@@ -245,18 +304,14 @@ async function fulfill(rest: string[]) {
           function: "fulfill",
           args: [
             { type: "binary", value: res.toBytes().toString("base64") },
-            { type: "binary", value: base64Encode(pool) },
-            { type: "binary", value: base64Encode(txId) },
+            { type: "binary", value: base64Encode(base58Decode(req.pool)) },
+            { type: "binary", value: base64Encode(req.txId) },
           ],
         },
         chainId: chainId,
       },
-      treasury.seed
+      treasury.seed,
     ),
-    Boolean(values.apply)
+    Boolean(values.apply),
   );
-}
-
-function escapeRegExp(string: string) {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

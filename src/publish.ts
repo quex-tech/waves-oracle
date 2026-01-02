@@ -1,14 +1,14 @@
-import { invokeScript } from "@waves/waves-transactions";
-import { SignerClient } from "./signer.js";
-import { responses as responsesWallet, treasury, oracles } from "./wallets.js";
-import { base58Decode } from "@waves/ts-lib-crypto";
-import { asStringArg, handleTx } from "./utils.js";
-import { chainId } from "./network.js";
 import { keygen } from "@noble/secp256k1";
+import { base58Decode } from "@waves/ts-lib-crypto";
+import { invokeScript } from "@waves/waves-transactions";
 import fs from "fs";
-import { parseHttpAction } from "./httpAction.js";
-import { HttpActionWithProof } from "./models.js";
 import { parseArgs } from "node:util";
+import { parseHttpAction } from "./httpAction.js";
+import { HttpActionWithProof } from "./lib/models.js";
+import { chainId } from "./lib/network.js";
+import { SignerClient } from "./lib/signer.js";
+import { asStringArg, handleTx } from "./lib/utils.js";
+import { oracles, responses as responsesWallet, treasury } from "./lib/wallets.js";
 
 const { values } = parseArgs({
   options: {
@@ -70,7 +70,7 @@ if (values["output-request"]) {
 
 const res = await signerClient.query(
   actionWithProof,
-  base58Decode(treasury.address)
+  base58Decode(treasury.address),
 );
 console.log(res);
 await handleTx(
@@ -86,9 +86,9 @@ await handleTx(
       },
       chainId: chainId,
     },
-    treasury.seed
+    treasury.seed,
   ),
-  Boolean(values.apply)
+  Boolean(values.apply),
 );
 
 function printHelp() {

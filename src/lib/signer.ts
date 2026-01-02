@@ -11,7 +11,7 @@ class SignerClient {
 
   async query(
     action: HttpActionWithProof,
-    relayer: Uint8Array
+    relayer: Uint8Array,
   ): Promise<QuexResponse> {
     const res = await fetch(new URL("/query", this.url), {
       method: "POST",
@@ -24,7 +24,7 @@ class SignerClient {
     });
     if (!res.ok) {
       throw new Error(
-        `Failed to query signer: ${res.status} ${res.statusText}`
+        `Failed to query signer: ${res.status} ${res.statusText}`,
       );
     }
     const body = (await res.json()) as JsonQuexResponse;
@@ -35,7 +35,7 @@ class SignerClient {
     const res = await fetch(new URL("/pubkey", this.url));
     if (!res.ok) {
       throw new Error(
-        `Failed to get signer's public key: ${res.status} ${res.statusText}`
+        `Failed to get signer's public key: ${res.status} ${res.statusText}`,
       );
     }
     return hexToBuffer(await res.text());
@@ -45,7 +45,7 @@ class SignerClient {
     const res = await fetch(new URL("/address", this.url));
     if (!res.ok) {
       throw new Error(
-        `Failed to get signer's address: ${res.status} ${res.statusText}`
+        `Failed to get signer's address: ${res.status} ${res.statusText}`,
       );
     }
     return await res.text();

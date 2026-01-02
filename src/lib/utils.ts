@@ -7,6 +7,8 @@ import {
 import { broadcast, waitForTx } from "@waves/waves-transactions";
 import { nodeUrl } from "./network.js";
 
+export const wvs = 10 ** 8;
+
 function removePrefix(s: string, p: string): string {
   return s.startsWith(p) ? s.slice(p.length) : s;
 }
@@ -23,7 +25,7 @@ function getEnvVar(name: string) {
 
 async function handleTx(
   tx: SignedTransaction<Transaction> & WithId,
-  apply: boolean
+  apply: boolean,
 ) {
   console.log("Transaction:", tx);
   if (!apply) {
@@ -39,7 +41,7 @@ async function handleTx(
 }
 
 function asOptionalStringArg(
-  val: string | boolean | undefined
+  val: string | boolean | undefined,
 ): string | undefined {
   if (typeof val === "string") {
     return val;
@@ -64,12 +66,25 @@ function parseBinaryEntry(entry: DataTransactionEntry) {
   return Buffer.from(entry.value, "base64");
 }
 
+function parseIntegerEntry(entry: DataTransactionEntry) {
+  if (entry.type !== "integer") {
+    throw Error("Invalid integer entry");
+  }
+
+  if (typeof entry.value === "string") {
+    throw Error("Integer is too large");
+  }
+
+  return entry.value;
+}
+
 export {
-  hexToBuffer,
-  getEnvVar,
-  handleTx,
-  removePrefix,
   asOptionalStringArg,
   asStringArg,
-  parseBinaryEntry
+  getEnvVar,
+  handleTx,
+  hexToBuffer,
+  parseBinaryEntry,
+  parseIntegerEntry,
+  removePrefix,
 };
