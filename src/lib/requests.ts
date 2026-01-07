@@ -1,7 +1,13 @@
-import { base58Decode, base58Encode } from "@waves/ts-lib-crypto";
+import { base58Decode, base58Encode, base64Encode } from "@waves/ts-lib-crypto";
 import { DataTransactionEntry } from "@waves/ts-types";
+import { invokeScript, TSeedTypes } from "@waves/waves-transactions";
 import { accountData } from "@waves/waves-transactions/dist/nodeInteraction.js";
-import { HttpAction, HttpActionWithProof } from "./models.js";
+import {
+  FullPoolId,
+  HttpAction,
+  HttpActionWithProof,
+  QuexResponse,
+} from "./models.js";
 import {
   groupFieldsByKey,
   parseBinaryEntry,
@@ -32,37 +38,139 @@ export async function findRequest(
   address: string,
   nodeUrl: string,
 ) {
-  const currentData = await accountData(
+  const data = await accountData(
     { address: address, match: `${escapeRegExp(key)}:.*` },
     nodeUrl,
   );
-  const req: Record<string, DataTransactionEntry> = {};
-
-  for (const k of Object.keys(currentData)) {
-    const parts = k.split(":");
-    if (parts.length !== 4) {
-      continue;
-    }
-    req[parts[3]] = currentData[k];
+  const entries = Object.entries(groupFieldsByKey(data));
+  if (!entries.length) {
+    return null;
   }
 
   try {
-    return parseRequest(key, req);
+    return parseRequest(entries[0][0], entries[0][1]);
   } catch {
     return null;
   }
 }
 
+export function addRequest(
+  action: HttpActionWithProof,
+  responsesAddress: string,
+  pool: FullPoolId,
+  nowUnixMs: number,
+  reward: number,
+  dApp: string,
+  chainId: string,
+  seed: TSeedTypes,
+) {
+  const nowUnixSec = Math.floor(nowUnixMs / 1000);
+  return invokeScript(
+    {
+      dApp: dApp,
+      call: {
+        function: "add",
+        args: [
+          {
+            type: "binary",
+            value: Buffer.from(base58Decode(responsesAddress)).toString(
+              "base64",
+            ),
+          },
+          {
+            type: "binary",
+            value: pool.toBytes().toString("base64"),
+          },
+          {
+            type: "binary",
+            value: action.action.toBytes().toString("base64"),
+          },
+          {
+            type: "binary",
+            value: action.proof.toString("base64"),
+          },
+          {
+            type: "integer",
+            value: nowUnixSec,
+          },
+          {
+            type: "integer",
+            value: nowUnixSec + 5 * 60,
+          },
+        ],
+      },
+      chainId: chainId,
+      payment: [{ amount: reward }],
+    },
+    seed,
+  );
+}
+
+export function recycleRequest(
+  key: string,
+  dApp: string,
+  chainId: string,
+  seed: TSeedTypes,
+) {
+  return invokeScript(
+    {
+      dApp: dApp,
+      call: {
+        function: "recycle",
+        args: [
+          {
+            type: "string",
+            value: key,
+          },
+        ],
+      },
+      chainId: chainId,
+    },
+    seed,
+  );
+}
+
+export function fulfillRequest(
+  res: QuexResponse,
+  responsesAddress: string,
+  pool: FullPoolId,
+  txId: string,
+  dApp: string,
+  chainId: string,
+  seed: TSeedTypes,
+) {
+  return invokeScript(
+    {
+      dApp: dApp,
+      call: {
+        function: "fulfill",
+        args: [
+          { type: "binary", value: res.toBytes().toString("base64") },
+          {
+            type: "binary",
+            value: base64Encode(base58Decode(responsesAddress)),
+          },
+          { type: "binary", value: pool.toBytes().toString("base64") },
+          { type: "binary", value: base64Encode(base58Decode(txId)) },
+        ],
+      },
+      chainId: chainId,
+    },
+    seed,
+  );
+}
+
 function parseRequest(key: string, req: Record<string, DataTransactionEntry>) {
-  const [pool, actionId, txId] = key.split(":").map(base58Decode);
+  const [responsesAddress, pool, actionId, txId] = key.split(":");
   const action = HttpAction.fromBytes(parseBinaryEntry(req.action));
-  if (action.getActionId().compare(actionId) !== 0) {
+  if (action.getActionId().compare(base58Decode(actionId)) !== 0) {
     throw new Error("Invalid action ID");
   }
   return {
     key: key,
-    pool: base58Encode(pool),
-    actionId: actionId,
+    responsesAddress: responsesAddress,
+    pool: FullPoolId.fromBytes(base58Decode(pool)),
+    actionId: Buffer.from(base58Decode(actionId)),
     txId: txId,
     action: new HttpActionWithProof(action, parseBinaryEntry(req.proof)),
     after: new Date(parseIntegerEntry(req.after) * 1000),

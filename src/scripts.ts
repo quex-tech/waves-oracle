@@ -1,6 +1,5 @@
 import fs from "fs";
 import { nodeUrl } from "./lib/network.js";
-import { responses as responsesWallet } from "./lib/wallets.js";
 
 export const oracles = await doCompile(
   fs.readFileSync("./src/ride/oracles.ride", "utf-8"),
@@ -9,9 +8,7 @@ export const responses = await doCompile(
   fs.readFileSync("./src/ride/responses.ride", "utf-8"),
 );
 export const requests = await doCompile(
-  fs
-    .readFileSync("./src/ride/requests.ride", "utf-8")
-    .replaceAll("ResponsesgQSB1AcUHHFzRUjMpx7j35YsQv", responsesWallet.address),
+  fs.readFileSync("./src/ride/requests.ride", "utf-8"),
 );
 export const quotes = await doCompile(
   fs.readFileSync("./src/ride/quotes.ride", "utf-8"),

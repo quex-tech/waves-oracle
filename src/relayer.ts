@@ -1,9 +1,8 @@
-import { base58Decode, base64Encode } from "@waves/ts-lib-crypto";
-import { invokeScript } from "@waves/waves-transactions";
+import { base58Decode } from "@waves/ts-lib-crypto";
 import { readFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
 import { ANY_TD_ADDRESS } from "./lib/models.js";
-import { fetchRequests } from "./lib/requests.js";
+import { fetchRequests, fulfillRequest } from "./lib/requests.js";
 import { SignerClient } from "./lib/signer.js";
 import { handleTx, wvs } from "./lib/utils.js";
 import { treasury } from "./lib/wallets.js";
@@ -19,7 +18,8 @@ type NetworkConfig = {
   chainId: string;
   nodeUrls: string[];
   requestsAddress: string;
-  pools: Record<string, PoolConfig>;
+  responsesAddress: string;
+  pools: Record<string, Record<string, PoolConfig>>;
 };
 
 type PoolConfig = {
@@ -81,7 +81,17 @@ for (const network of config.networks) {
       continue;
     }
 
-    const pool = network.pools[req.pool];
+    const now = new Date();
+    if (req.after > now || req.before < now) {
+      continue;
+    }
+
+    const addressPools = network.pools[req.pool.address];
+    if (!addressPools) {
+      continue;
+    }
+
+    const pool = addressPools[req.pool.id.toString("hex")];
     if (!pool) {
       continue;
     }
@@ -102,23 +112,22 @@ for (const network of config.networks) {
       base58Decode(treasury.address),
     );
 
-    await handleTx(
-      invokeScript(
-        {
-          dApp: network.requestsAddress,
-          call: {
-            function: "fulfill",
-            args: [
-              { type: "binary", value: res.toBytes().toString("base64") },
-              { type: "binary", value: base64Encode(base58Decode(req.pool)) },
-              { type: "binary", value: base64Encode(req.txId) },
-            ],
-          },
-          chainId: network.chainId,
-        },
-        treasury.seed,
-      ),
-      Boolean(values.apply),
-    );
+    try {
+      await handleTx(
+        fulfillRequest(
+          res,
+          network.responsesAddress,
+          req.pool,
+          req.txId,
+          network.requestsAddress,
+          network.chainId,
+          treasury.seed,
+        ),
+        Boolean(values.apply),
+      );
+    } catch (e) {
+      console.log(e);
+      continue;
+    }
   }
 }

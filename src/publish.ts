@@ -23,9 +23,13 @@ const { values } = parseArgs({
       type: "string",
       default: process.env["ORACLE_URL"],
     },
-    pool: {
+    "pool-addr": {
       type: "string",
       default: oracles.address,
+    },
+    "pool-id": {
+      type: "string",
+      default: "",
     },
     apply: {
       type: "boolean",
@@ -77,6 +81,12 @@ const res = await signerClient.query(
   base58Decode(treasury.address),
 );
 console.log(res);
+
+const fullPoolId = Buffer.concat([
+  base58Decode(asStringArg(values["pool-addr"])),
+  Buffer.from(asStringArg(values["pool-id"]), "hex"),
+]);
+
 await handleTx(
   invokeScript(
     {
@@ -85,7 +95,7 @@ await handleTx(
         function: "publish",
         args: [
           { type: "binary", value: res.toBytes().toString("base64") },
-          { type: "string", value: asStringArg(values.pool) },
+          { type: "binary", value: fullPoolId.toString("base64") },
         ],
       },
       chainId: chainId,
@@ -110,7 +120,8 @@ function printHelp() {
      --output-request <path>    Save base64-encoded request into a file
      --from-file <path>         Use request from file
      --oracle-url <url>         Base URL of the oracle API
-     --pool <address>           Address of the oracle pool script with isInPool method. Default: ${oracles.address}
+     --pool-addr <address>      Address of the oracle pool script with isInPool method. Default: ${oracles.address}
+     --pool-id <address>        Pool ID in hex. Default: empty (pool is defined by the address)
      --apply                    Actually submit the transaction
  -h, --help                     Show this help message and exit`);
 }

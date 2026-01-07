@@ -2,6 +2,7 @@ import { base58Decode, base58Encode } from "@waves/ts-lib-crypto";
 import { data } from "@waves/waves-transactions";
 import { accountData } from "@waves/waves-transactions/dist/nodeInteraction.js";
 import { parseArgs } from "util";
+import { FullPoolId } from "./lib/models.js";
 import { chainId, nodeUrl } from "./lib/network.js";
 import { SignerClient } from "./lib/signer.js";
 import { handleTx } from "./lib/utils.js";
@@ -33,6 +34,10 @@ async function add(args: string[]) {
       apply: {
         type: "boolean",
       },
+      "pool-id": {
+        type: "string",
+        default: "",
+      },
     },
     allowPositionals: true,
   });
@@ -42,7 +47,8 @@ async function add(args: string[]) {
       {
         data: [
           {
-            key: base58Encode(
+            key: makeKey(
+              values["pool-id"],
               await new SignerClient(positionals[0]).publicKey(),
             ),
             type: "boolean",
@@ -64,6 +70,10 @@ async function del(args: string[]) {
       apply: {
         type: "boolean",
       },
+      "pool-id": {
+        type: "string",
+        default: "",
+      },
     },
     allowPositionals: true,
   });
@@ -73,10 +83,11 @@ async function del(args: string[]) {
       {
         data: [
           {
-            key: base58Encode(
+            key: makeKey(
+              values["pool-id"],
               await new SignerClient(positionals[0]).publicKey(),
             ),
-          },
+          }
         ],
         chainId: chainId,
       },
@@ -87,10 +98,23 @@ async function del(args: string[]) {
 }
 
 async function list() {
-  const currentData = await accountData({ address: oracles.address }, nodeUrl);
-  console.log(
-    Object.keys(currentData)
-      .filter((x) => currentData[x].value)
-      .map((x) => Buffer.from(base58Decode(x)).toString("hex")),
-  );
+  const data = await accountData({ address: oracles.address }, nodeUrl);
+    console.log(`Pool Address:    ${oracles.address}
+Oracles:`);
+  for (const [key, val] of Object.entries(data)) {
+    if (!val.value) {
+      continue;
+    }
+    const [poolId, pk] = key.split(":");
+    const fullPoolId = new FullPoolId(
+      oracles.address,
+      Buffer.from(base58Decode(poolId)),
+    );
+    console.log(`  - Public Key:  ${Buffer.from(base58Decode(pk)).toString("hex")}
+    Pool ID:     ${fullPoolId.formatId()}`);
+  }
+}
+
+function makeKey(pool: string, pk: Buffer) {
+  return `${base58Encode(Buffer.from(pool, "hex"))}:${base58Encode(pk)}`;
 }

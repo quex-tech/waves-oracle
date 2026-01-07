@@ -4,11 +4,14 @@
       "chainId": "R",
       "nodeUrls": ["http://localhost:6869/"],
       "requestsAddress": "3M3hcSBqTF5SJxespKA13S6y6nFS9zA2eJX",
+      "responsesAddress": "3MJfAPuSQgQSB1AcUHHFzRUjMpx7j35YsQv",
       "pools": {
         "3MGqWUDyZuENhGUK7MqcavBbgtTgfMeDzUW": {
-          "addresses": {
-            "0x769A785Ee2b0E648C65E21cB14372c9D9e816b7d": {
-              "urls": ["http://10.13.192.142:8080/"]
+          "": {
+            "addresses": {
+              "0x769A785Ee2b0E648C65E21cB14372c9D9e816b7d": {
+                "urls": ["http://10.13.192.142:8080/"]
+              }
             }
           }
         }

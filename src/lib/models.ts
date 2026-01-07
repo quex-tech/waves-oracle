@@ -1,5 +1,5 @@
 import { getPublicKey } from "@noble/secp256k1";
-import { keccak } from "@waves/ts-lib-crypto";
+import { base58Decode, base58Encode, keccak } from "@waves/ts-lib-crypto";
 import { URL } from "node:url";
 import { encrypt } from "./crypto.js";
 
@@ -662,5 +662,27 @@ export class QeReport {
     res.writeInt16LE(this.isvSvn, 258);
     this.reportData.copy(res, 320);
     return res;
+  }
+}
+
+export class FullPoolId {
+  constructor(
+    public readonly address: string,
+    public readonly id: Buffer,
+  ) {}
+
+  static fromBytes(buf: Uint8Array) {
+    return new FullPoolId(
+      base58Encode(buf.subarray(0, 26)),
+      Buffer.from(buf.subarray(26)),
+    );
+  }
+
+  toBytes() {
+    return Buffer.concat([base58Decode(this.address), this.id]);
+  }
+
+  formatId() {
+    return this.id.length ? this.id.toString("hex") : "Default";
   }
 }

@@ -3,9 +3,9 @@
 {-# SCRIPT_TYPE ACCOUNT #-}
 
 @Callable(i)
-func isInPool(pk: ByteVector) = {
+func isInPool(pk: ByteVector, pool: ByteVector) = {
   let present =
-    match getBoolean(this, toBase58String(pk)) {
+    match getBoolean(this, toBase58String(pool) + ":" + toBase58String(pk)) {
       case b: Boolean => b
       case _          => false
     }

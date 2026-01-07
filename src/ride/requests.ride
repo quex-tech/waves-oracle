@@ -3,8 +3,8 @@
 {-# SCRIPT_TYPE ACCOUNT #-}
 
 @Callable(i)
-func add(pool: ByteVector, action: ByteVector, proof: ByteVector, after: Int, before: Int) = {
-    let keyBase = toBase58String(pool) + ":" + toBase58String(keccak256_16Kb(action)) + ":" + toBase58String(i.transactionId) + ":"
+func add(resAddr: ByteVector, pool: ByteVector, action: ByteVector, proof: ByteVector, after: Int, before: Int) = {
+    let keyBase = toBase58String(resAddr) + ":" + toBase58String(pool) + ":" + toBase58String(keccak256_16Kb(action)) + ":" + toBase58String(i.transactionId) + ":"
     let payment = getElement(i.payments, 0)
     if isDefined(payment.assetId) then throw("currency") else {
       [
@@ -40,16 +40,16 @@ func recycle(key: String) = {
 }
 
 @Callable(i)
-func fulfill(res: ByteVector, pool: ByteVector, txId: ByteVector) = {
+func fulfill(res: ByteVector, resAddr: ByteVector, pool: ByteVector, txId: ByteVector) = {
   let actIdL = toInt(res)
   let relayerL = toInt(res, 8 + actIdL)
   let time = toInt(res, 8 + actIdL + 8 + relayerL)
-  strict actionId_ = invoke(Address(base58'ResponsesgQSB1AcUHHFzRUjMpx7j35YsQv'), "publish", [res, pool], [])
+  strict actionId_ = invoke(Address(resAddr), "publish", [res, pool], [])
   let actionId = match actionId_ {
     case b: ByteVector => b
     case _ => throw("actionId")
   }
-  let keyBase = toBase58String(pool) + ":" + toBase58String(actionId) + ":" + toBase58String(txId) + ":"
+  let keyBase = toBase58String(resAddr) + ":" + toBase58String(pool) + ":" + toBase58String(actionId) + ":" + toBase58String(txId) + ":"
   let after = getIntegerValue(keyBase + "after")
   let before = getIntegerValue(keyBase + "before")
   if time < after || time > before then throw("time") else {

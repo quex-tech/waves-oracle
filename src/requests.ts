@@ -1,11 +1,16 @@
 import { keygen } from "@noble/secp256k1";
-import { base58Decode, base58Encode, base64Encode } from "@waves/ts-lib-crypto";
-import { invokeScript } from "@waves/waves-transactions";
+import { base58Decode, base58Encode } from "@waves/ts-lib-crypto";
 import { parseArgs } from "node:util";
 import { parseHttpAction } from "./httpAction.js";
-import { HttpActionWithProof } from "./lib/models.js";
+import { FullPoolId, HttpActionWithProof } from "./lib/models.js";
 import { chainId, nodeUrl } from "./lib/network.js";
-import { fetchRequests, findRequest } from "./lib/requests.js";
+import {
+  addRequest,
+  fetchRequests,
+  findRequest,
+  fulfillRequest,
+  recycleRequest,
+} from "./lib/requests.js";
 import { SignerClient } from "./lib/signer.js";
 import {
   asOptionalStringArg,
@@ -13,7 +18,7 @@ import {
   handleTx,
   wvs,
 } from "./lib/utils.js";
-import { oracles, requests, treasury } from "./lib/wallets.js";
+import { oracles, requests, responses, treasury } from "./lib/wallets.js";
 
 const [command, ...rest] = process.argv.slice(2);
 
@@ -39,8 +44,14 @@ switch (command) {
 
 async function list() {
   for (const req of await fetchRequests(requests.address, nodeUrl)) {
-    console.log("- Key:    ", req.key);
-    console.log("  Request:", req.action.action.request.formatMethodAndUrl());
+    console.log(`- Key:                ${req.key}
+  Responses Address:  ${req.responsesAddress}
+  Pool:
+    Address:          ${req.pool.address}
+    ID:               ${req.pool.formatId()}
+  Action ID:          ${req.actionId.toString("hex")}
+  Tx ID:              ${req.txId}
+  Request:            ${req.action.action.request.formatMethodAndUrl()}`);
     if (
       req.action.action.request.headers.length ||
       req.action.action.patch.headers.length
@@ -58,12 +69,12 @@ async function list() {
     } else if (req.action.action.request.body.length) {
       console.log("  Body:   ", req.action.action.request.body);
     }
-    console.log("  Filter: ", req.action.action.filter);
-    console.log("  Schema: ", req.action.action.schema);
-    console.log("  After:  ", req.after.toISOString());
-    console.log("  Before: ", req.before.toISOString());
-    console.log("  Owner:  ", req.owner);
-    console.log(`  Reward:  ${req.reward / wvs} WAVES`);
+    console.log(`  Filter:             ${req.action.action.filter}
+  Schema:             ${req.action.action.schema}
+  After:              ${req.after.toISOString()}
+  Before:             ${req.before.toISOString()}
+  Owner:              ${req.owner}
+  Reward:             ${req.reward / wvs} WAVES`);
   }
 }
 
@@ -74,9 +85,13 @@ async function add(rest: string[]) {
         type: "string",
         default: process.env["ORACLE_URL"],
       },
-      pool: {
+      "pool-addr": {
         type: "string",
         default: oracles.address,
+      },
+      "pool-id": {
+        type: "string",
+        default: "",
       },
       apply: {
         type: "boolean",
@@ -104,7 +119,8 @@ async function add(rest: string[]) {
      --output-request <path>    Save base64-encoded request into a file
      --from-file <path>         Use request from file
      --oracle-url <url>         Base URL of the oracle API
-     --pool <address>           Address of the oracle pool script with isInPool method. Default: ${oracles.address}
+     --pool-addr <address>      Address of the oracle pool script with isInPool method. Default: ${oracles.address}
+     --pool-id <address>        Pool ID in hex. Default: empty (pool is defined by the address)
      --apply                    Actually submit the transaction
  -h, --help                     Show this help message and exit`);
   }
@@ -144,45 +160,26 @@ async function add(rest: string[]) {
           .encrypt(tdPublicKey, await signerClient.address(), senderPrivKey)
           .addProof(tdPublicKey, senderPrivKey);
 
-  const now = Math.floor(Date.now() / 1000);
-  const tx = invokeScript(
-    {
-      dApp: requests.address,
-      call: {
-        function: "add",
-        args: [
-          {
-            type: "binary",
-            value: Buffer.from(base58Decode(asStringArg(values.pool))).toString(
-              "base64",
-            ),
-          },
-          {
-            type: "binary",
-            value: actionWithProof.action.toBytes().toString("base64"),
-          },
-          {
-            type: "binary",
-            value: actionWithProof.proof.toString("base64"),
-          },
-          {
-            type: "integer",
-            value: now,
-          },
-          {
-            type: "integer",
-            value: now + 5 * 60,
-          },
-        ],
-      },
-      chainId: chainId,
-      payment: [{ amount: 0.01 * wvs }],
-    },
+  const fullPoolId = new FullPoolId(
+    asStringArg(values["pool-addr"]),
+    Buffer.from(asStringArg(values["pool-id"]), "hex"),
+  );
+
+  const tx = addRequest(
+    actionWithProof,
+    responses.address,
+    fullPoolId,
+    Date.now(),
+    0.01 * wvs,
+    requests.address,
+    chainId,
     treasury.seed,
   );
+
   await handleTx(tx, Boolean(values.apply));
+
   console.log(
-    `Key: ${asStringArg(values.pool)}:${base58Encode(
+    `Key: ${base58Encode(fullPoolId.toBytes())}:${base58Encode(
       actionWithProof.action.getActionId(),
     )}:${tx.id}`,
   );
@@ -217,27 +214,13 @@ async function recycle(rest: string[]) {
   }
 
   if (!positionals[0]) {
+    console.log("Key is required");
     printHelp();
     process.exit(1);
   }
 
   await handleTx(
-    invokeScript(
-      {
-        dApp: requests.address,
-        call: {
-          function: "recycle",
-          args: [
-            {
-              type: "string",
-              value: positionals[0],
-            },
-          ],
-        },
-        chainId: chainId,
-      },
-      treasury.seed,
-    ),
+    recycleRequest(positionals[0], requests.address, chainId, treasury.seed),
     Boolean(values.apply),
   );
 }
@@ -296,20 +279,15 @@ async function fulfill(rest: string[]) {
     req.action,
     base58Decode(treasury.address),
   );
+
   await handleTx(
-    invokeScript(
-      {
-        dApp: requests.address,
-        call: {
-          function: "fulfill",
-          args: [
-            { type: "binary", value: res.toBytes().toString("base64") },
-            { type: "binary", value: base64Encode(base58Decode(req.pool)) },
-            { type: "binary", value: base64Encode(req.txId) },
-          ],
-        },
-        chainId: chainId,
-      },
+    fulfillRequest(
+      res,
+      req.responsesAddress,
+      req.pool,
+      req.txId,
+      requests.address,
+      chainId,
       treasury.seed,
     ),
     Boolean(values.apply),
