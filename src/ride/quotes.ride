@@ -84,9 +84,10 @@ func register(
       if !p256Verify(take(attestationKey, 32), drop(attestationKey, 32), take(quoteSig, 32), drop(quoteSig, 32), quoteId) then
         throw("sig quote")
       else {
+        let keyBase = toBase58String(quoteId) 
         [
-          BinaryEntry(toBase58String(quoteId) + ":quote", quote),
-          BinaryEntry(toBase58String(quoteId) + ":qe-report", qeReport)
+          BinaryEntry(keyBase + ":quote", quote),
+          BinaryEntry(keyBase + ":qe-report", qeReport)
         ]
       }
     }

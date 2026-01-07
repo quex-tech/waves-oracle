@@ -13,6 +13,9 @@ export const requests = await doCompile(
 export const quotes = await doCompile(
   fs.readFileSync("./src/ride/quotes.ride", "utf-8"),
 );
+export const attestedPools = await doCompile(
+  fs.readFileSync("./src/ride/attested-pools.ride", "utf-8"),
+);
 
 type CompilationResult = {
   script: string;

@@ -1,4 +1,3 @@
-import { base58Encode } from "@waves/ts-lib-crypto";
 import { parseArgs } from "util";
 import { chainId, nodeUrl } from "./lib/network.js";
 import { addOracle, deleteOracle, fetchOracles } from "./lib/privatePools.js";
@@ -144,8 +143,8 @@ async function list(args: string[]) {
   console.log(`Pool Address:    ${privatePools.address}
 Oracles:`);
   for (const oracle of privateOracles) {
-    console.log(`  - Public Key:  ${oracle.publicKey.toString("hex")}
-    Pool ID:     ${oracle.pool.formatId()}
-    Owner:       ${base58Encode(oracle.pool.id.subarray(0, 26))}`);
+    console.log(`- Public Key:  ${oracle.publicKey.toString("hex")}
+  Pool ID:     ${oracle.pool.formatId()}
+  Owner:       ${oracle.ownerAddress}`);
   }
 }

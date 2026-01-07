@@ -7,6 +7,7 @@ import { parseArgs } from "node:util";
 import { chainId, nodeUrl } from "./lib/network.js";
 import { handleTx, removePrefix, wvs } from "./lib/utils.js";
 import {
+  attestedPools as attestedPoolsWallet,
   privatePools as privatePoolsWallet,
   quotes as quotesWallet,
   requests as requestsWallet,
@@ -15,6 +16,7 @@ import {
   Wallet,
 } from "./lib/wallets.js";
 import {
+  attestedPools as attestedPoolsScript,
   privatePools as privatePoolsScript,
   quotes as quotesScript,
   requests as requestsScript,
@@ -33,11 +35,13 @@ await fund(privatePoolsWallet.address, 0.01 * wvs, 0.0025 * wvs);
 await fund(responsesWallet.address, 0.01 * wvs, 0.0025 * wvs);
 await fund(requestsWallet.address, 0.01 * wvs, 0.0025 * wvs);
 await fund(quotesWallet.address, 0.01 * wvs, 0.0025 * wvs);
+await fund(attestedPoolsWallet.address, 0.01 * wvs, 0.0025 * wvs);
 
 await deployScript(privatePoolsWallet, privatePoolsScript);
 await deployScript(responsesWallet, responsesScript);
 await deployScript(requestsWallet, requestsScript);
 await deployScript(quotesWallet, quotesScript);
+await deployScript(attestedPoolsWallet, attestedPoolsScript);
 
 async function fund(address: string, amount: number, ifLess: number) {
   const oracleBalance = await balance(address, nodeUrl);

@@ -179,7 +179,7 @@ async function add(rest: string[]) {
   await handleTx(tx, Boolean(values.apply));
 
   console.log(
-    `Key: ${base58Encode(fullPoolId.toBytes())}:${base58Encode(
+    `Key: ${fullPoolId.address}:${base58Encode(fullPoolId.id)}:${base58Encode(
       actionWithProof.action.getActionId(),
     )}:${tx.id}`,
   );

@@ -14,6 +14,15 @@
               }
             }
           }
+        },
+        "3MG4iWUwv79zHPbuAoMs3rRUM4cb8LnhxuT": {
+          "0152589d492ecc97cfa5250814633e875a06dd2652a9106f48c60eead84301f9bd084dcd0ffadd54b6179232082bea2a217f4d6f7590a58ba9f4": {
+            "addresses": {
+              "0x769A785Ee2b0E648C65E21cB14372c9D9e816b7d": {
+                "urls": ["http://10.13.192.142:8080/"]
+              }
+            }
+          }
         }
       }
     }

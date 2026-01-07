@@ -1,5 +1,10 @@
 import { getPublicKey } from "@noble/secp256k1";
-import { base58Decode, base58Encode, keccak } from "@waves/ts-lib-crypto";
+import {
+  base58Decode,
+  base58Encode,
+  keccak,
+  sha256,
+} from "@waves/ts-lib-crypto";
 import { URL } from "node:url";
 import { encrypt } from "./crypto.js";
 
@@ -517,6 +522,12 @@ export class Quote {
     public readonly body: QuoteBody,
     public readonly signatureData: QuoteSignatureData,
   ) {}
+
+  getQuoteId(): Buffer {
+    return Buffer.from(
+      sha256(Buffer.concat([this.header.toBytes(), this.body.toBytes()])),
+    );
+  }
 }
 
 export class QuoteHeader {
@@ -678,8 +689,8 @@ export class FullPoolId {
     );
   }
 
-  toBytes() {
-    return Buffer.concat([base58Decode(this.address), this.id]);
+  addressBytes() {
+    return Buffer.from(base58Decode(this.address));
   }
 
   formatId() {

@@ -16,9 +16,10 @@ import {
 
 export type OracleRequest = {
   key: string;
-  pool: string;
-  actionId: Uint8Array;
-  txId: Uint8Array;
+  responsesAddress: string;
+  pool: FullPoolId;
+  actionId: Buffer;
+  txId: string;
   action: HttpActionWithProof;
   after: Date;
   before: Date;
@@ -79,7 +80,11 @@ export function addRequest(
           },
           {
             type: "binary",
-            value: pool.toBytes().toString("base64"),
+            value: pool.addressBytes().toString("base64"),
+          },
+          {
+            type: "binary",
+            value: pool.id.toString("base64"),
           },
           {
             type: "binary",
@@ -150,7 +155,8 @@ export function fulfillRequest(
             type: "binary",
             value: base64Encode(base58Decode(responsesAddress)),
           },
-          { type: "binary", value: pool.toBytes().toString("base64") },
+          { type: "binary", value: pool.addressBytes().toString("base64") },
+          { type: "binary", value: pool.id.toString("base64") },
           { type: "binary", value: base64Encode(base58Decode(txId)) },
         ],
       },
@@ -160,8 +166,12 @@ export function fulfillRequest(
   );
 }
 
-function parseRequest(key: string, req: Record<string, DataTransactionEntry>) {
-  const [responsesAddress, pool, actionId, txId] = key.split(":");
+function parseRequest(
+  key: string,
+  req: Record<string, DataTransactionEntry>,
+): OracleRequest {
+  const [responsesAddress, poolAddress, poolId, actionId, txId] =
+    key.split(":");
   const action = HttpAction.fromBytes(parseBinaryEntry(req.action));
   if (action.getActionId().compare(base58Decode(actionId)) !== 0) {
     throw new Error("Invalid action ID");
@@ -169,7 +179,7 @@ function parseRequest(key: string, req: Record<string, DataTransactionEntry>) {
   return {
     key: key,
     responsesAddress: responsesAddress,
-    pool: FullPoolId.fromBytes(base58Decode(pool)),
+    pool: new FullPoolId(poolAddress, Buffer.from(base58Decode(poolId))),
     actionId: Buffer.from(base58Decode(actionId)),
     txId: txId,
     action: new HttpActionWithProof(action, parseBinaryEntry(req.proof)),

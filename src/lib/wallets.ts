@@ -14,6 +14,7 @@ export const privatePools = deriveWallet(1);
 export const responses = deriveWallet(2);
 export const requests = deriveWallet(3);
 export const quotes = deriveWallet(4);
+export const attestedPools = deriveWallet(5);
 
 function deriveWallet(index: number) {
   const s = seedWithNonce(seed, index);

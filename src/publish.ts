@@ -4,7 +4,7 @@ import { invokeScript } from "@waves/waves-transactions";
 import fs from "fs";
 import { parseArgs } from "node:util";
 import { parseHttpAction } from "./httpAction.js";
-import { HttpActionWithProof } from "./lib/models.js";
+import { FullPoolId, HttpActionWithProof } from "./lib/models.js";
 import { chainId } from "./lib/network.js";
 import { SignerClient } from "./lib/signer.js";
 import { asStringArg, handleTx } from "./lib/utils.js";
@@ -82,10 +82,10 @@ const res = await signerClient.query(
 );
 console.log(res);
 
-const fullPoolId = Buffer.concat([
-  base58Decode(asStringArg(values["pool-addr"])),
+const fullPoolId = new FullPoolId(
+  asStringArg(values["pool-addr"]),
   Buffer.from(asStringArg(values["pool-id"]), "hex"),
-]);
+);
 
 await handleTx(
   invokeScript(
@@ -95,7 +95,11 @@ await handleTx(
         function: "publish",
         args: [
           { type: "binary", value: res.toBytes().toString("base64") },
-          { type: "binary", value: fullPoolId.toString("base64") },
+          {
+            type: "binary",
+            value: fullPoolId.addressBytes().toString("base64"),
+          },
+          { type: "binary", value: fullPoolId.id.toString("base64") },
         ],
       },
       chainId: chainId,
