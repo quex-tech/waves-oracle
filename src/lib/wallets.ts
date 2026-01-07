@@ -10,7 +10,7 @@ export type Wallet = {
 const seed = getEnvVar("SEED");
 
 export const treasury = deriveWallet(0);
-export const oracles = deriveWallet(1);
+export const privatePools = deriveWallet(1);
 export const responses = deriveWallet(2);
 export const requests = deriveWallet(3);
 export const quotes = deriveWallet(4);

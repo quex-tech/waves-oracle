@@ -9,7 +9,7 @@ import { chainId } from "./lib/network.js";
 import { SignerClient } from "./lib/signer.js";
 import { asStringArg, handleTx } from "./lib/utils.js";
 import {
-  oracles,
+  privatePools,
   responses as responsesWallet,
   treasury,
 } from "./lib/wallets.js";
@@ -25,7 +25,7 @@ const { values } = parseArgs({
     },
     "pool-addr": {
       type: "string",
-      default: oracles.address,
+      default: privatePools.address,
     },
     "pool-id": {
       type: "string",
@@ -120,7 +120,7 @@ function printHelp() {
      --output-request <path>    Save base64-encoded request into a file
      --from-file <path>         Use request from file
      --oracle-url <url>         Base URL of the oracle API
-     --pool-addr <address>      Address of the oracle pool script with isInPool method. Default: ${oracles.address}
+     --pool-addr <address>      Address of the oracle pool script with isInPool method. Default: ${privatePools.address}
      --pool-id <address>        Pool ID in hex. Default: empty (pool is defined by the address)
      --apply                    Actually submit the transaction
  -h, --help                     Show this help message and exit`);

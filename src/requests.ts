@@ -18,7 +18,7 @@ import {
   handleTx,
   wvs,
 } from "./lib/utils.js";
-import { oracles, requests, responses, treasury } from "./lib/wallets.js";
+import { privatePools, requests, responses, treasury } from "./lib/wallets.js";
 
 const [command, ...rest] = process.argv.slice(2);
 
@@ -87,7 +87,7 @@ async function add(rest: string[]) {
       },
       "pool-addr": {
         type: "string",
-        default: oracles.address,
+        default: privatePools.address,
       },
       "pool-id": {
         type: "string",
@@ -119,7 +119,7 @@ async function add(rest: string[]) {
      --output-request <path>    Save base64-encoded request into a file
      --from-file <path>         Use request from file
      --oracle-url <url>         Base URL of the oracle API
-     --pool-addr <address>      Address of the oracle pool script with isInPool method. Default: ${oracles.address}
+     --pool-addr <address>      Address of the oracle pool script with isInPool method. Default: ${privatePools.address}
      --pool-id <address>        Pool ID in hex. Default: empty (pool is defined by the address)
      --apply                    Actually submit the transaction
  -h, --help                     Show this help message and exit`);

@@ -1,0 +1,24 @@
+{-# STDLIB_VERSION 7 #-}
+{-# CONTENT_TYPE DAPP #-}
+{-# SCRIPT_TYPE ACCOUNT #-}
+
+@Callable(i)
+func isInPool(pk: ByteVector, poolId: ByteVector) = {
+  let present =
+    match getBoolean(this, toBase58String(take(poolId, 26)) + ":" + toBase58String(drop(poolId, 26)) + ":" + toBase58String(pk)) {
+      case b: Boolean => b
+      case _          => false
+    }
+
+  ([], present)
+}
+
+@Callable(i)
+func add(poolIdSuffix: ByteVector, pk: ByteVector) = [
+  BooleanEntry(toBase58String(i.originCaller.bytes) + ":" + toBase58String(poolIdSuffix) + ":" + toBase58String(pk), true)
+]
+
+@Callable(i)
+func delete(poolIdSuffix: ByteVector, pk: ByteVector) = [
+  DeleteEntry(toBase58String(i.originCaller.bytes) + ":" + toBase58String(poolIdSuffix) + ":" + toBase58String(pk))
+]

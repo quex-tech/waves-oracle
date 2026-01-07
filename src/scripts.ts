@@ -1,8 +1,8 @@
 import fs from "fs";
 import { nodeUrl } from "./lib/network.js";
 
-export const oracles = await doCompile(
-  fs.readFileSync("./src/ride/oracles.ride", "utf-8"),
+export const privatePools = await doCompile(
+  fs.readFileSync("./src/ride/private-pools.ride", "utf-8"),
 );
 export const responses = await doCompile(
   fs.readFileSync("./src/ride/responses.ride", "utf-8"),
