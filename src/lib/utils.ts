@@ -9,21 +9,21 @@ import { nodeUrl } from "./network.js";
 
 export const wvs = 10 ** 8;
 
-function removePrefix(s: string, p: string): string {
+export function removePrefix(s: string, p: string): string {
   return s.startsWith(p) ? s.slice(p.length) : s;
 }
 
-function hexToBuffer(hex: string): Buffer {
+export function hexToBuffer(hex: string): Buffer {
   return Buffer.from(removePrefix(hex, "0x"), "hex");
 }
 
-function getEnvVar(name: string) {
+export function getEnvVar(name: string) {
   const v = process.env[name];
   if (v == null || v === "") throw new Error(`Missing env var: ${name}`);
   return v;
 }
 
-async function handleTx(
+export async function handleTx(
   tx: SignedTransaction<Transaction> & WithId,
   apply: boolean,
 ) {
@@ -40,7 +40,7 @@ async function handleTx(
   console.log("Transaction confirmed.");
 }
 
-function asOptionalStringArg(
+export function asOptionalStringArg(
   val: string | boolean | undefined,
 ): string | undefined {
   if (typeof val === "string") {
@@ -49,14 +49,14 @@ function asOptionalStringArg(
   return undefined;
 }
 
-function asStringArg(val: string | boolean): string {
+export function asStringArg(val: string | boolean): string {
   if (typeof val === "string") {
     return val;
   }
   return "";
 }
 
-function parseBinaryEntry(entry: DataTransactionEntry) {
+export function parseBinaryEntry(entry: DataTransactionEntry) {
   if (entry.type !== "binary") {
     throw Error("Invalid binary entry");
   }
@@ -66,7 +66,7 @@ function parseBinaryEntry(entry: DataTransactionEntry) {
   return Buffer.from(entry.value, "base64");
 }
 
-function parseIntegerEntry(entry: DataTransactionEntry) {
+export function parseIntegerEntry(entry: DataTransactionEntry) {
   if (entry.type !== "integer") {
     throw Error("Invalid integer entry");
   }
@@ -78,13 +78,12 @@ function parseIntegerEntry(entry: DataTransactionEntry) {
   return entry.value;
 }
 
-export {
-  asOptionalStringArg,
-  asStringArg,
-  getEnvVar,
-  handleTx,
-  hexToBuffer,
-  parseBinaryEntry,
-  parseIntegerEntry,
-  removePrefix,
-};
+export function groupFieldsByKey(data: Record<string, DataTransactionEntry>) {
+  const res: Record<string, Record<string, DataTransactionEntry>> = {};
+  for (const [key, val] of Object.entries(data)) {
+    const lastSepIdx = key.lastIndexOf(":");
+    const field = key.slice(lastSepIdx + 1);
+    (res[key.slice(0, lastSepIdx)] ||= {})[field] = val;
+  }
+  return res;
+}

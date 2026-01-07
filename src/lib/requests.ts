@@ -2,7 +2,11 @@ import { base58Decode, base58Encode } from "@waves/ts-lib-crypto";
 import { DataTransactionEntry } from "@waves/ts-types";
 import { accountData } from "@waves/waves-transactions/dist/nodeInteraction.js";
 import { HttpAction, HttpActionWithProof } from "./models.js";
-import { parseBinaryEntry, parseIntegerEntry } from "./utils.js";
+import {
+  groupFieldsByKey,
+  parseBinaryEntry,
+  parseIntegerEntry,
+} from "./utils.js";
 
 export type OracleRequest = {
   key: string;
@@ -17,30 +21,10 @@ export type OracleRequest = {
 };
 
 export async function fetchRequests(address: string, nodeUrl: string) {
-  const currentData = await accountData({ address: address }, nodeUrl);
-  const groupedData: Record<string, Record<string, DataTransactionEntry>> = {};
-
-  for (const key of Object.keys(currentData)) {
-    const parts = key.split(":");
-    if (parts.length !== 4) {
-      continue;
-    }
-    const [pool, actionId, txId, field] = parts;
-    (groupedData[[pool, actionId, txId].join(":")] ||= {})[field] =
-      currentData[key];
-  }
-
-  const result: OracleRequest[] = [];
-
-  for (const key of Object.keys(groupedData)) {
-    try {
-      result.push(parseRequest(key, groupedData[key]));
-    } catch {
-      continue;
-    }
-  }
-
-  return result;
+  const data = await accountData({ address: address }, nodeUrl);
+  return Object.entries(groupFieldsByKey(data)).map(([key, value]) =>
+    parseRequest(key, value),
+  );
 }
 
 export async function findRequest(

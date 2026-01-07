@@ -2,9 +2,8 @@ import { getPublicKey } from "@noble/secp256k1";
 import { keccak } from "@waves/ts-lib-crypto";
 import { URL } from "node:url";
 import { encrypt } from "./crypto.js";
-import { hexToBuffer } from "./utils.js";
 
-const HTTP_METHODS = {
+export const HTTP_METHODS = {
   GET: 0,
   POST: 1,
   PATCH: 2,
@@ -17,9 +16,9 @@ const HTTP_METHOD_NAMES = Object.entries(HTTP_METHODS)
   .sort((a, b) => a[1] - b[1])
   .map(([name]) => name as HttpMethodName);
 
-const ANY_TD_ADDRESS = "0x0000000000000000000000000000000000000000";
+export const ANY_TD_ADDRESS = "0x0000000000000000000000000000000000000000";
 
-type HttpMethodName = keyof typeof HTTP_METHODS;
+export type HttpMethodName = keyof typeof HTTP_METHODS;
 
 export function isHttpMethod(value: string): value is HttpMethodName {
   return HTTP_METHODS[value as HttpMethodName] !== undefined;
@@ -81,7 +80,7 @@ const dec = {
   },
 };
 
-class RequestHeader {
+export class RequestHeader {
   constructor(
     public readonly key: string,
     public readonly value: string,
@@ -101,7 +100,7 @@ class RequestHeader {
   }
 }
 
-class QueryParameter {
+export class QueryParameter {
   constructor(
     public readonly key: string,
     public readonly value: string,
@@ -116,7 +115,7 @@ class QueryParameter {
   }
 }
 
-class HttpRequest {
+export class HttpRequest {
   constructor(
     public readonly method: HttpMethodName,
     public readonly host: string,
@@ -186,7 +185,7 @@ class HttpRequest {
   }
 }
 
-class RequestHeaderPatch {
+export class RequestHeaderPatch {
   constructor(
     public readonly key: string,
     public readonly ciphertext: Buffer,
@@ -201,7 +200,7 @@ class RequestHeaderPatch {
   }
 }
 
-class QueryParameterPatch {
+export class QueryParameterPatch {
   constructor(
     public readonly key: string,
     public readonly ciphertext: Buffer,
@@ -216,7 +215,7 @@ class QueryParameterPatch {
   }
 }
 
-class HttpPrivatePatch {
+export class HttpPrivatePatch {
   constructor(
     public readonly pathSuffix: Buffer,
     public readonly headers: RequestHeaderPatch[],
@@ -265,7 +264,7 @@ class HttpPrivatePatch {
   }
 }
 
-class UnencryptedHttpPrivatePatch {
+export class UnencryptedHttpPrivatePatch {
   constructor(
     public readonly pathSuffix: Buffer | null,
     public readonly headers: RequestHeader[],
@@ -383,7 +382,7 @@ export class UnencryptedHttpAction {
   }
 }
 
-class HttpAction {
+export class HttpAction {
   constructor(
     public readonly request: HttpRequest,
     public readonly patch: HttpPrivatePatch,
@@ -439,7 +438,7 @@ class HttpAction {
   }
 }
 
-class HttpActionWithProof {
+export class HttpActionWithProof {
   constructor(
     public readonly action: HttpAction,
     public readonly proof: Buffer,
@@ -461,43 +460,12 @@ class HttpActionWithProof {
   }
 }
 
-type JsonDataItem = {
-  timestamp: number;
-  error: number;
-  value: string;
-};
-
-type JsonQuexMessage = {
-  action_id: string;
-  data_item: JsonDataItem;
-  relayer: string;
-};
-
-type JsonSignature = {
-  r: string;
-  s: string;
-  v: number;
-};
-
-type JsonQuexResponse = {
-  msg: JsonQuexMessage;
-  sig: JsonSignature;
-};
-
-class DataItem {
+export class DataItem {
   constructor(
     public readonly timestamp: number,
     public readonly error: number,
     public readonly value: Buffer,
   ) {}
-
-  static parse(json: JsonDataItem): DataItem {
-    return new DataItem(
-      json.timestamp,
-      json.error,
-      Buffer.from(json.value, "base64"),
-    );
-  }
 
   static fromBytes(buf: Buffer): DataItem {
     return this.fromReader(dec.from(buf));
@@ -516,20 +484,12 @@ class DataItem {
   }
 }
 
-class QuexMessage {
+export class QuexMessage {
   constructor(
     public readonly actionId: Buffer,
     public readonly dataItem: DataItem,
     public readonly relayer: Buffer,
   ) {}
-
-  static parse(json: JsonQuexMessage): QuexMessage {
-    return new QuexMessage(
-      Buffer.from(json.action_id, "base64"),
-      DataItem.parse(json.data_item),
-      hexToBuffer(json.relayer),
-    );
-  }
 
   toBytes(): Buffer {
     return Buffer.concat([
@@ -540,42 +500,167 @@ class QuexMessage {
   }
 }
 
-class QuexResponse {
+export class QuexResponse {
   constructor(
     public readonly message: QuexMessage,
     public readonly signature: Buffer,
   ) {}
-
-  static parse(json: JsonQuexResponse): QuexResponse {
-    return new QuexResponse(
-      QuexMessage.parse(json.msg),
-      Buffer.concat([
-        Buffer.from(json.sig.r, "base64"),
-        Buffer.from(json.sig.s, "base64"),
-        Buffer.from([json.sig.v]),
-      ]),
-    );
-  }
 
   toBytes(): Buffer {
     return Buffer.concat([this.message.toBytes(), enc.bytes(this.signature)]);
   }
 }
 
-export {
-  ANY_TD_ADDRESS,
-  DataItem,
-  HTTP_METHODS,
-  HttpAction,
-  HttpActionWithProof,
-  HttpMethodName,
-  HttpPrivatePatch,
-  HttpRequest,
-  JsonQuexResponse,
-  QueryParameter,
-  QueryParameterPatch,
-  QuexResponse,
-  RequestHeader,
-  RequestHeaderPatch,
-  UnencryptedHttpPrivatePatch,
-};
+export class Quote {
+  constructor(
+    public readonly header: QuoteHeader,
+    public readonly body: QuoteBody,
+    public readonly signatureData: QuoteSignatureData,
+  ) {}
+}
+
+export class QuoteHeader {
+  constructor(
+    public readonly version: number,
+    public readonly attestationKeyType: number,
+    public readonly teeType: number,
+    public readonly qeVendorId: Buffer,
+    public readonly userData: Buffer,
+  ) {}
+
+  static fromBytes(buf: Buffer) {
+    return new QuoteHeader(
+      buf.readInt16LE(),
+      buf.readInt16LE(2),
+      buf.readInt32LE(4),
+      buf.subarray(12, 28),
+      buf.subarray(28, 48),
+    );
+  }
+
+  toBytes() {
+    const res = Buffer.alloc(48);
+    res.writeInt16LE(this.version);
+    res.writeInt16LE(this.attestationKeyType, 2);
+    res.writeInt32LE(this.teeType, 4);
+    this.qeVendorId.copy(res, 12);
+    this.userData.copy(res, 28);
+    return res;
+  }
+}
+
+export class QuoteBody {
+  constructor(
+    public readonly tcbSvn: Buffer,
+    public readonly mrSeam: Buffer,
+    public readonly mrSignerSeam: Buffer,
+    public readonly seamAttributes: Buffer,
+    public readonly tdAttributes: Buffer,
+    public readonly xfam: Buffer,
+    public readonly mrtd: Buffer,
+    public readonly mrConfigId: Buffer,
+    public readonly mrOwner: Buffer,
+    public readonly mrOwnerConfig: Buffer,
+    public readonly rtmr: Buffer[],
+    public readonly reportData: Buffer,
+  ) {}
+
+  static fromBytes(buf: Buffer) {
+    return new QuoteBody(
+      buf.subarray(0, 16),
+      buf.subarray(16, 64),
+      buf.subarray(64, 112),
+      buf.subarray(112, 120),
+      buf.subarray(120, 128),
+      buf.subarray(128, 136),
+      buf.subarray(136, 184),
+      buf.subarray(184, 232),
+      buf.subarray(232, 280),
+      buf.subarray(280, 328),
+      [
+        buf.subarray(328, 376),
+        buf.subarray(376, 424),
+        buf.subarray(424, 472),
+        buf.subarray(472, 520),
+      ],
+      buf.subarray(520, 584),
+    );
+  }
+
+  toBytes() {
+    const res = Buffer.alloc(584);
+    this.tcbSvn.copy(res);
+    this.mrSeam.copy(res, 16);
+    this.mrSignerSeam.copy(res, 64);
+    this.seamAttributes.copy(res, 112);
+    this.tdAttributes.copy(res, 120);
+    this.xfam.copy(res, 128);
+    this.mrtd.copy(res, 136);
+    this.mrConfigId.copy(res, 184);
+    this.mrOwner.copy(res, 232);
+    this.mrOwnerConfig.copy(res, 280);
+    this.rtmr[0].copy(res, 328);
+    this.rtmr[1].copy(res, 376);
+    this.rtmr[2].copy(res, 424);
+    this.rtmr[3].copy(res, 472);
+    this.reportData.copy(res, 520);
+    return res;
+  }
+}
+
+export class QuoteSignatureData {
+  constructor(
+    public readonly signature: Buffer,
+    public readonly attestationKey: Buffer,
+    public readonly qeCertificationData: QeCertificationData,
+  ) {}
+}
+
+export class QeCertificationData {
+  constructor(
+    public readonly type: number,
+    public readonly authData: Buffer,
+    public readonly certChain: Buffer[],
+    public readonly report: QeReport,
+    public readonly reportSignature: Buffer,
+  ) {}
+}
+
+export class QeReport {
+  constructor(
+    public readonly cpuSvn: Buffer,
+    public readonly miscSelect: number,
+    public readonly attributes: Buffer,
+    public readonly mrEnclave: Buffer,
+    public readonly mrSigner: Buffer,
+    public readonly isvProdId: number,
+    public readonly isvSvn: number,
+    public readonly reportData: Buffer,
+  ) {}
+
+  static fromBytes(buf: Buffer) {
+    return new QeReport(
+      buf.subarray(0, 16),
+      buf.readInt32LE(16),
+      buf.subarray(48, 64),
+      buf.subarray(64, 96),
+      buf.subarray(128, 160),
+      buf.readInt16LE(256),
+      buf.readInt16LE(258),
+      buf.subarray(320, 384),
+    );
+  }
+
+  toBytes() {
+    const res = Buffer.alloc(384);
+    this.cpuSvn.copy(res);
+    res.writeInt32LE(this.miscSelect, 16);
+    this.attributes.copy(res, 48);
+    this.mrEnclave.copy(res, 64);
+    this.mrSigner.copy(res, 128);
+    res.writeInt16LE(this.isvProdId, 256);
+    res.writeInt16LE(this.isvSvn, 258);
+    this.reportData.copy(res, 320);
+    return res;
+  }
+}

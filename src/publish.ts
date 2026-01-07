@@ -8,7 +8,11 @@ import { HttpActionWithProof } from "./lib/models.js";
 import { chainId } from "./lib/network.js";
 import { SignerClient } from "./lib/signer.js";
 import { asStringArg, handleTx } from "./lib/utils.js";
-import { oracles, responses as responsesWallet, treasury } from "./lib/wallets.js";
+import {
+  oracles,
+  responses as responsesWallet,
+  treasury,
+} from "./lib/wallets.js";
 
 const { values } = parseArgs({
   options: {

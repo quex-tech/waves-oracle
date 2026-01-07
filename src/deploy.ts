@@ -7,17 +7,19 @@ import { parseArgs } from "node:util";
 import { chainId, nodeUrl } from "./lib/network.js";
 import { handleTx, removePrefix, wvs } from "./lib/utils.js";
 import {
-  oracles as oraclesScript,
-  requests as requestsScript,
-  responses as responsesScript,
-} from "./scripts.js";
-import {
   oracles as oraclesWallet,
+  quotes as quotesWallet,
   requests as requestsWallet,
   responses as responsesWallet,
   treasury,
   Wallet,
 } from "./lib/wallets.js";
+import {
+  oracles as oraclesScript,
+  quotes as quotesScript,
+  requests as requestsScript,
+  responses as responsesScript,
+} from "./scripts.js";
 
 const { values } = parseArgs({
   options: {
@@ -30,10 +32,12 @@ const { values } = parseArgs({
 await fund(oraclesWallet.address, 0.02 * wvs, 0.005 * wvs);
 await fund(responsesWallet.address, 0.01 * wvs, 0.0025 * wvs);
 await fund(requestsWallet.address, 0.01 * wvs, 0.0025 * wvs);
+await fund(quotesWallet.address, 0.01 * wvs, 0.0025 * wvs);
 
 await deployScript(oraclesWallet, oraclesScript);
 await deployScript(responsesWallet, responsesScript);
 await deployScript(requestsWallet, requestsScript);
+await deployScript(quotesWallet, quotesScript);
 
 async function fund(address: string, amount: number, ifLess: number) {
   const oracleBalance = await balance(address, nodeUrl);

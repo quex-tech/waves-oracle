@@ -11,10 +11,7 @@
     "prepare": "npm run build"
   },
   "dependencies": {
-    "@noble/curves": "^1.9.7",
-    "@noble/hashes": "^1.8.0",
     "@noble/secp256k1": "^3.0.0",
-    "@waves/ride-js": "^2.2.9",
     "@waves/ts-lib-crypto": "^1.4.4",
     "@waves/waves-transactions": "^4.3.11"
   },
