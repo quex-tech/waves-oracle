@@ -4,7 +4,6 @@ import fs from "fs";
 import { parseArgs } from "node:util";
 import { parseHttpAction } from "./httpAction.js";
 import { FullPoolId, HttpActionWithProof } from "./lib/models.js";
-import { chainId } from "./lib/network.js";
 import { publishResponse } from "./lib/responses.js";
 import { SignerClient } from "./lib/signer.js";
 import { asStringArg, handleTx } from "./lib/utils.js";
@@ -24,12 +23,15 @@ const { values } = parseArgs({
       default: process.env["ORACLE_URL"],
     },
     "pool-addr": {
-      type: "string",
-      default: privatePools.address,
+      type: "string"
     },
     "pool-id": {
       type: "string",
       default: "",
+    },
+    chain: {
+      type: "string",
+      default: "R",
     },
     apply: {
       type: "boolean",
@@ -75,15 +77,15 @@ if (values["output-request"]) {
   const encodedAction = actionWithProof.toBytes().toString("base64");
   fs.writeFileSync(asStringArg(values["output-request"]), encodedAction);
 }
-
+const chainId = asStringArg(values.chain);
 const res = await signerClient.query(
   actionWithProof,
-  base58Decode(treasury.address),
+  base58Decode(treasury.address(chainId)),
 );
 console.log(res);
 
 const fullPoolId = new FullPoolId(
-  asStringArg(values["pool-addr"]),
+  asStringArg(values["pool-addr"] ?? privatePools.address(chainId)),
   Buffer.from(asStringArg(values["pool-id"]), "hex"),
 );
 
@@ -91,7 +93,7 @@ await handleTx(
   publishResponse(
     res,
     fullPoolId,
-    responsesWallet.address,
+    responsesWallet.address(chainId),
     chainId,
     treasury.seed,
   ),
@@ -113,8 +115,9 @@ function printHelp() {
      --output-request <path>    Save base64-encoded request into a file
      --from-file <path>         Use request from file
      --oracle-url <url>         Base URL of the oracle API
-     --pool-addr <address>      Address of the oracle pool script with isInPool method. Default: ${privatePools.address}
+     --pool-addr <address>      Address of the oracle pool script with isInPool method
      --pool-id <address>        Pool ID in hex. Default: empty (pool is defined by the address)
+     --chain <id>               Chain ID. Default: R
      --apply                    Actually submit the transaction
  -h, --help                     Show this help message and exit`);
 }

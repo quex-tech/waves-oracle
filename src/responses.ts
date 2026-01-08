@@ -1,8 +1,25 @@
+import { parseArgs } from "node:util";
 import { nodeUrl } from "./lib/network.js";
 import { fetchResponses } from "./lib/responses.js";
 import { responses } from "./lib/wallets.js";
 
-for (const res of await fetchResponses(responses.address, nodeUrl)) {
+const { values } = parseArgs({
+  options: {
+    chain: {
+      type: "string",
+      default: "R",
+    },
+    help: {
+      type: "boolean",
+      short: "h",
+    },
+  },
+});
+
+for (const res of await fetchResponses(
+  responses.address(values.chain),
+  nodeUrl,
+)) {
   console.log(`- Action ID:  ${res.actionId.toString("hex")}
   Pool:
     Address:  ${res.pool.address}

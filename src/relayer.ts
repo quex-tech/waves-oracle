@@ -109,7 +109,7 @@ for (const network of config.networks) {
 
     const res = await signerClient.query(
       req.action,
-      base58Decode(treasury.address),
+      base58Decode(treasury.address(network.chainId)),
     );
 
     try {

@@ -1,6 +1,6 @@
 import { base58Encode } from "@waves/ts-lib-crypto";
 import { parseArgs } from "node:util";
-import { chainId, nodeUrl } from "./lib/network.js";
+import { nodeUrl } from "./lib/network.js";
 import { fetchQuotes, registerQuote } from "./lib/quotes.js";
 import { SignerClient } from "./lib/signer.js";
 import { handleTx } from "./lib/utils.js";
@@ -13,7 +13,7 @@ switch (command) {
     await register(rest);
     break;
   case "list":
-    await list();
+    await list(rest);
     break;
   default:
     console.log(`Usage: ${process.argv[0]} ${process.argv[1]} register|list`);
@@ -28,6 +28,10 @@ async function register(rest: string[]) {
         type: "string",
         default: process.env["ORACLE_URL"],
       },
+      chain: {
+        type: "string",
+        default: "R",
+      },
       apply: {
         type: "boolean",
       },
@@ -41,6 +45,7 @@ async function register(rest: string[]) {
     console.log(
       `Usage: ${process.argv[0]} ${process.argv[1]} register [options]
      --oracle-url <url>  Base URL of the oracle API
+     --chain <id>        Chain ID. Default: R
      --apply             Actually submit the transactions
  -h, --help              Show this help message and exit`,
     );
@@ -58,13 +63,49 @@ async function register(rest: string[]) {
 
   const quote = await new SignerClient(oracleUrl).quote();
   await handleTx(
-    registerQuote(quote, quotesWallet.address, chainId, treasury.seed),
+    registerQuote(
+      quote,
+      quotesWallet.address(values.chain),
+      values.chain,
+      treasury.seed,
+    ),
     Boolean(values.apply),
   );
 }
 
-async function list() {
-  const quotes = await fetchQuotes(quotesWallet.address, nodeUrl);
+async function list(rest: string[]) {
+  const { values } = parseArgs({
+    args: rest,
+    options: {
+      "oracle-url": {
+        type: "string",
+        default: process.env["ORACLE_URL"],
+      },
+      chain: {
+        type: "string",
+        default: "R",
+      },
+      apply: {
+        type: "boolean",
+      },
+      help: {
+        type: "boolean",
+        short: "h",
+      },
+    },
+  });
+  function printHelp() {
+    console.log(
+      `Usage: ${process.argv[0]} ${process.argv[1]} list [options]
+     --chain <id>        Chain ID. Default: R
+ -h, --help              Show this help message and exit`,
+    );
+  }
+  if (values.help) {
+    printHelp();
+    process.exit(0);
+  }
+  const quotes = await fetchQuotes(quotesWallet.address(values.chain), nodeUrl);
   for (const quote of quotes) {
     console.log(`- Id: ${base58Encode(quote.id)}
   Quote:

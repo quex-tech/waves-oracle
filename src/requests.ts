@@ -3,7 +3,7 @@ import { base58Decode, base58Encode } from "@waves/ts-lib-crypto";
 import { parseArgs } from "node:util";
 import { parseHttpAction } from "./httpAction.js";
 import { FullPoolId, HttpActionWithProof } from "./lib/models.js";
-import { chainId, nodeUrl } from "./lib/network.js";
+import { nodeUrl } from "./lib/network.js";
 import {
   addRequest,
   fetchRequests,
@@ -24,7 +24,7 @@ const [command, ...rest] = process.argv.slice(2);
 
 switch (command) {
   case "list":
-    await list();
+    await list(rest);
     break;
   case "add":
     await add(rest);
@@ -42,8 +42,37 @@ switch (command) {
     break;
 }
 
-async function list() {
-  for (const req of await fetchRequests(requests.address, nodeUrl)) {
+async function list(rest: string[]) {
+  const { values } = parseArgs({
+    args: rest,
+    options: {
+      chain: {
+        type: "string",
+        default: "R",
+      },
+      help: {
+        type: "boolean",
+        short: "h",
+      },
+    },
+  });
+
+  function printHelp() {
+    console.log(
+      `Usage: ${process.argv[0]} ${process.argv[1]} list [options]
+     --chain <id>        Chain ID. Default: R
+ -h, --help              Show this help message and exit`,
+    );
+  }
+
+  if (values.help) {
+    printHelp();
+    process.exit(0);
+  }
+  for (const req of await fetchRequests(
+    requests.address(values.chain),
+    nodeUrl,
+  )) {
     console.log(`- Key:                ${req.key}
   Responses Address:  ${req.responsesAddress}
   Pool:
@@ -87,11 +116,14 @@ async function add(rest: string[]) {
       },
       "pool-addr": {
         type: "string",
-        default: privatePools.address,
       },
       "pool-id": {
         type: "string",
         default: "",
+      },
+      chain: {
+        type: "string",
+        default: "R",
       },
       apply: {
         type: "boolean",
@@ -119,8 +151,9 @@ async function add(rest: string[]) {
      --output-request <path>    Save base64-encoded request into a file
      --from-file <path>         Use request from file
      --oracle-url <url>         Base URL of the oracle API
-     --pool-addr <address>      Address of the oracle pool script with isInPool method. Default: ${privatePools.address}
+     --pool-addr <address>      Address of the oracle pool script with isInPool method
      --pool-id <address>        Pool ID in hex. Default: empty (pool is defined by the address)
+     --chain <id>               Chain ID. Default: R
      --apply                    Actually submit the transaction
  -h, --help                     Show this help message and exit`);
   }
@@ -160,19 +193,20 @@ async function add(rest: string[]) {
           .encrypt(tdPublicKey, await signerClient.address(), senderPrivKey)
           .addProof(tdPublicKey, senderPrivKey);
 
+  const chainId = asStringArg(values.chain);
   const fullPoolId = new FullPoolId(
-    asStringArg(values["pool-addr"]),
+    asStringArg(values["pool-addr"] ?? privatePools.address(chainId)),
     Buffer.from(asStringArg(values["pool-id"]), "hex"),
   );
 
   const tx = addRequest(
     actionWithProof,
-    responses.address,
+    responses.address(chainId),
     fullPoolId,
     Date.now(),
     0.01 * wvs,
-    requests.address,
-    chainId,
+    requests.address(chainId),
+    asStringArg(values.chain),
     treasury.seed,
   );
 
@@ -192,6 +226,10 @@ async function recycle(rest: string[]) {
       apply: {
         type: "boolean",
       },
+      chain: {
+        type: "string",
+        default: "R",
+      },
       help: {
         type: "boolean",
         short: "h",
@@ -203,6 +241,7 @@ async function recycle(rest: string[]) {
   function printHelp() {
     console.log(
       `Usage: ${process.argv[0]} ${process.argv[1]} recycle [options] <key>
+     --chain <id>        Chain ID. Default: R
      --apply             Actually submit the transaction
  -h, --help              Show this help message and exit`,
     );
@@ -220,7 +259,12 @@ async function recycle(rest: string[]) {
   }
 
   await handleTx(
-    recycleRequest(positionals[0], requests.address, chainId, treasury.seed),
+    recycleRequest(
+      positionals[0],
+      requests.address(values.chain),
+      values.chain,
+      treasury.seed,
+    ),
     Boolean(values.apply),
   );
 }
@@ -232,6 +276,10 @@ async function fulfill(rest: string[]) {
       "oracle-url": {
         type: "string",
         default: process.env["ORACLE_URL"],
+      },
+      chain: {
+        type: "string",
+        default: "R",
       },
       apply: {
         type: "boolean",
@@ -248,6 +296,7 @@ async function fulfill(rest: string[]) {
     console.log(
       `Usage: ${process.argv[0]} ${process.argv[1]} fulfill [options] <key>
      --oracle-url <url>  Base URL of the oracle API
+     --chain <id>        Chain ID. Default: R
      --apply             Actually submit the transaction
  -h, --help              Show this help message and exit`,
     );
@@ -269,7 +318,7 @@ async function fulfill(rest: string[]) {
   }
 
   const key = positionals[0];
-  const req = await findRequest(key, requests.address, nodeUrl);
+  const req = await findRequest(key, requests.address(values.chain), nodeUrl);
   if (!req) {
     throw new Error("Request is not found");
   }
@@ -277,7 +326,7 @@ async function fulfill(rest: string[]) {
   const signerClient = new SignerClient(oracleUrl);
   const res = await signerClient.query(
     req.action,
-    base58Decode(treasury.address),
+    base58Decode(treasury.address(values.chain)),
   );
 
   await handleTx(
@@ -286,8 +335,8 @@ async function fulfill(rest: string[]) {
       req.responsesAddress,
       req.pool,
       req.txId,
-      requests.address,
-      chainId,
+      requests.address(values.chain),
+      values.chain,
       treasury.seed,
     ),
     Boolean(values.apply),

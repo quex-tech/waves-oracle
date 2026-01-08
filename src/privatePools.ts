@@ -1,5 +1,5 @@
 import { parseArgs } from "util";
-import { chainId, nodeUrl } from "./lib/network.js";
+import { nodeUrl } from "./lib/network.js";
 import { addOracle, deleteOracle, fetchOracles } from "./lib/privatePools.js";
 import { SignerClient } from "./lib/signer.js";
 import { handleTx } from "./lib/utils.js";
@@ -33,6 +33,10 @@ async function add(args: string[]) {
         type: "string",
         default: "",
       },
+      chain: {
+        type: "string",
+        default: "R",
+      },
       help: {
         type: "boolean",
         short: "h",
@@ -44,6 +48,7 @@ async function add(args: string[]) {
     console.log(
       `Usage: ${process.argv[0]} ${process.argv[1]} add [options] <oracle-url>
      --pool-id-suffix <hex>  Optional pool ID suffix (hex)
+     --chain <id>            Chain ID. Default: R
      --apply                 Actually submit the transactions
  -h, --help                  Show this help message and exit`,
     );
@@ -60,10 +65,10 @@ async function add(args: string[]) {
 
   await handleTx(
     addOracle(
-      privatePools.address,
+      privatePools.address(values.chain),
       Buffer.from(values["pool-id-suffix"], "hex"),
       await new SignerClient(positionals[0]).publicKey(),
-      chainId,
+      values.chain,
       treasury,
     ),
     Boolean(values.apply),
@@ -81,6 +86,10 @@ async function del(args: string[]) {
         type: "string",
         default: "",
       },
+      chain: {
+        type: "string",
+        default: "R",
+      },
       help: {
         type: "boolean",
         short: "h",
@@ -92,6 +101,7 @@ async function del(args: string[]) {
     console.log(
       `Usage: ${process.argv[0]} ${process.argv[1]} delete [options] <oracle-url>
      --pool-id-suffix <hex>  Optional pool ID suffix (hex)
+     --chain <id>            Chain ID. Default: R
      --apply                 Actually submit the transactions
  -h, --help                  Show this help message and exit`,
     );
@@ -108,10 +118,10 @@ async function del(args: string[]) {
 
   await handleTx(
     deleteOracle(
-      privatePools.address,
+      privatePools.address(values.chain),
       Buffer.from(values["pool-id-suffix"], "hex"),
       await new SignerClient(positionals[0]).publicKey(),
-      chainId,
+      values.chain,
       treasury,
     ),
     Boolean(values.apply),
@@ -122,6 +132,10 @@ async function list(args: string[]) {
   const { values } = parseArgs({
     args: args,
     options: {
+      chain: {
+        type: "string",
+        default: "R",
+      },
       help: {
         type: "boolean",
         short: "h",
@@ -131,6 +145,7 @@ async function list(args: string[]) {
   function printHelp() {
     console.log(
       `Usage: ${process.argv[0]} ${process.argv[1]} list [options]
+     --chain <id>           Chain ID. Default: R
  -h, --help                 Show this help message and exit`,
     );
   }
@@ -139,8 +154,8 @@ async function list(args: string[]) {
     process.exit(0);
   }
 
-  const privateOracles = await fetchOracles(privatePools.address, nodeUrl);
-  console.log(`Pool Address:    ${privatePools.address}
+  const privateOracles = await fetchOracles(privatePools.address(values.chain), nodeUrl);
+  console.log(`Pool Address:    ${privatePools.address(values.chain)}
 Oracles:`);
   for (const oracle of privateOracles) {
     console.log(`- Public Key:  ${oracle.publicKey.toString("hex")}

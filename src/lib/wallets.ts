@@ -1,10 +1,9 @@
 import { crypto, seedWithNonce } from "@waves/ts-lib-crypto";
 import { TSeedTypes } from "@waves/waves-transactions";
-import { chainId } from "./network.js";
 import { getEnvVar } from "./utils.js";
 
 export type Wallet = {
-  address: string;
+  address: (chainId: string) => string;
   seed: TSeedTypes;
 };
 
@@ -17,8 +16,8 @@ export const requests = deriveWallet(3);
 export const quotes = deriveWallet(4);
 export const attestedPools = deriveWallet(5);
 
-function deriveWallet(index: number) {
+function deriveWallet(index: number): Wallet {
   const s = seedWithNonce(seed, index);
   const c = crypto({ seed: s, output: "Base58" });
-  return { address: c.address(chainId), seed: { privateKey: c.privateKey() } };
+  return { address: c.address, seed: { privateKey: c.privateKey() } };
 }

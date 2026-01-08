@@ -1,6 +1,6 @@
 import { parseArgs } from "util";
 import { addOracle, fetchOracles } from "./lib/attestedPools.js";
-import { chainId, nodeUrl } from "./lib/network.js";
+import { nodeUrl } from "./lib/network.js";
 import { SignerClient } from "./lib/signer.js";
 import { handleTx } from "./lib/utils.js";
 import { attestedPools, quotes, treasury } from "./lib/wallets.js";
@@ -26,6 +26,10 @@ async function add(args: string[]) {
       apply: {
         type: "boolean",
       },
+      chain: {
+        type: "string",
+        default: "R",
+      },
       help: {
         type: "boolean",
         short: "h",
@@ -36,6 +40,7 @@ async function add(args: string[]) {
   function printHelp() {
     console.log(
       `Usage: ${process.argv[0]} ${process.argv[1]} add [options] <oracle-url>
+     --chain <id>            Chain ID. Default: R
      --apply                 Actually submit the transactions
  -h, --help                  Show this help message and exit`,
     );
@@ -54,10 +59,10 @@ async function add(args: string[]) {
 
   await handleTx(
     addOracle(
-      quotes.address,
+      quotes.address(values.chain),
       quote.getQuoteId(),
-      attestedPools.address,
-      chainId,
+      attestedPools.address(values.chain),
+      values.chain,
       treasury,
     ),
     Boolean(values.apply),
@@ -68,6 +73,10 @@ async function list(args: string[]) {
   const { values } = parseArgs({
     args: args,
     options: {
+      chain: {
+        type: "string",
+        default: "R",
+      },
       help: {
         type: "boolean",
         short: "h",
@@ -77,6 +86,7 @@ async function list(args: string[]) {
   function printHelp() {
     console.log(
       `Usage: ${process.argv[0]} ${process.argv[1]} list [options]
+     --chain <id>           Chain ID. Default: R
  -h, --help                 Show this help message and exit`,
     );
   }
@@ -85,8 +95,11 @@ async function list(args: string[]) {
     process.exit(0);
   }
 
-  const attestedOracles = await fetchOracles(attestedPools.address, nodeUrl);
-  console.log(`Pool Address:    ${attestedPools.address}
+  const attestedOracles = await fetchOracles(
+    attestedPools.address(values.chain),
+    nodeUrl,
+  );
+  console.log(`Pool Address:    ${attestedPools.address(values.chain)}
 Oracles:`);
   for (const oracle of attestedOracles) {
     console.log(`- Public Key:      ${oracle.publicKey.toString("hex")}

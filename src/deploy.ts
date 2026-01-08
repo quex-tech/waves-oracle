@@ -4,7 +4,7 @@ import {
   scriptInfo,
 } from "@waves/waves-transactions/dist/nodeInteraction.js";
 import { parseArgs } from "node:util";
-import { chainId, nodeUrl } from "./lib/network.js";
+import { nodeUrl } from "./lib/network.js";
 import { handleTx, removePrefix, wvs } from "./lib/utils.js";
 import {
   attestedPools as attestedPoolsWallet,
@@ -25,17 +25,21 @@ import {
 
 const { values } = parseArgs({
   options: {
+    chain: {
+      type: "string",
+      default: "R",
+    },
     apply: {
       type: "boolean",
     },
   },
 });
 
-await fund(privatePoolsWallet.address, 0.01 * wvs, 0.0025 * wvs);
-await fund(responsesWallet.address, 0.01 * wvs, 0.0025 * wvs);
-await fund(requestsWallet.address, 0.01 * wvs, 0.0025 * wvs);
-await fund(quotesWallet.address, 0.01 * wvs, 0.0025 * wvs);
-await fund(attestedPoolsWallet.address, 0.01 * wvs, 0.0025 * wvs);
+await fund(privatePoolsWallet.address(values.chain), 0.01 * wvs, 0.0025 * wvs);
+await fund(responsesWallet.address(values.chain), 0.01 * wvs, 0.0025 * wvs);
+await fund(requestsWallet.address(values.chain), 0.01 * wvs, 0.0025 * wvs);
+await fund(quotesWallet.address(values.chain), 0.01 * wvs, 0.0025 * wvs);
+await fund(attestedPoolsWallet.address(values.chain), 0.01 * wvs, 0.0025 * wvs);
 
 await deployScript(privatePoolsWallet, privatePoolsScript);
 await deployScript(responsesWallet, responsesScript);
@@ -51,7 +55,7 @@ async function fund(address: string, amount: number, ifLess: number) {
         {
           recipient: address,
           amount: amount,
-          chainId: chainId,
+          chainId: values.chain,
         },
         treasury.seed,
       ),
@@ -61,7 +65,7 @@ async function fund(address: string, amount: number, ifLess: number) {
 }
 
 async function deployScript(wallet: Wallet, script: string) {
-  const info = (await scriptInfo(wallet.address, nodeUrl)) as {
+  const info = (await scriptInfo(wallet.address(values.chain), nodeUrl)) as {
     script?: string;
   };
 
@@ -76,7 +80,7 @@ async function deployScript(wallet: Wallet, script: string) {
     setScript(
       {
         script: script,
-        chainId: chainId,
+        chainId: values.chain,
       },
       wallet.seed,
     ),
