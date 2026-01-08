@@ -1,11 +1,11 @@
 import { keygen } from "@noble/secp256k1";
 import { base58Decode } from "@waves/ts-lib-crypto";
-import { invokeScript } from "@waves/waves-transactions";
 import fs from "fs";
 import { parseArgs } from "node:util";
 import { parseHttpAction } from "./httpAction.js";
 import { FullPoolId, HttpActionWithProof } from "./lib/models.js";
 import { chainId } from "./lib/network.js";
+import { publishResponse } from "./lib/responses.js";
 import { SignerClient } from "./lib/signer.js";
 import { asStringArg, handleTx } from "./lib/utils.js";
 import {
@@ -88,22 +88,11 @@ const fullPoolId = new FullPoolId(
 );
 
 await handleTx(
-  invokeScript(
-    {
-      dApp: responsesWallet.address,
-      call: {
-        function: "publish",
-        args: [
-          { type: "binary", value: res.toBytes().toString("base64") },
-          {
-            type: "binary",
-            value: fullPoolId.addressBytes().toString("base64"),
-          },
-          { type: "binary", value: fullPoolId.id.toString("base64") },
-        ],
-      },
-      chainId: chainId,
-    },
+  publishResponse(
+    res,
+    fullPoolId,
+    responsesWallet.address,
+    chainId,
     treasury.seed,
   ),
   Boolean(values.apply),
