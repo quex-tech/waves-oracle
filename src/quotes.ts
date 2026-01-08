@@ -1,10 +1,10 @@
 import { base58Encode } from "@waves/ts-lib-crypto";
 import { parseArgs } from "node:util";
-import { nodeUrl } from "./lib/network.js";
+import { NetworkConfig } from "./lib/config.js";
 import { fetchQuotes, registerQuote } from "./lib/quotes.js";
 import { SignerClient } from "./lib/signer.js";
 import { handleTx } from "./lib/utils.js";
-import { quotes as quotesWallet, treasury } from "./lib/wallets.js";
+import { wallet } from "./lib/wallets.js";
 
 const [command, ...rest] = process.argv.slice(2);
 
@@ -21,12 +21,12 @@ switch (command) {
 }
 
 async function register(rest: string[]) {
-  const { values } = parseArgs({
+  const { values, positionals } = parseArgs({
     args: rest,
     options: {
-      "oracle-url": {
+      config: {
         type: "string",
-        default: process.env["ORACLE_URL"],
+        default: "./config.json",
       },
       chain: {
         type: "string",
@@ -40,11 +40,12 @@ async function register(rest: string[]) {
         short: "h",
       },
     },
+    allowPositionals: true,
   });
   function printHelp() {
     console.log(
-      `Usage: ${process.argv[0]} ${process.argv[1]} register [options]
-     --oracle-url <url>  Base URL of the oracle API
+      `Usage: ${process.argv[0]} ${process.argv[1]} register [options] <oracle-url>
+     --config <path>     Path to config.json. Default: ./config.json
      --chain <id>        Chain ID. Default: R
      --apply             Actually submit the transactions
  -h, --help              Show this help message and exit`,
@@ -54,22 +55,20 @@ async function register(rest: string[]) {
     printHelp();
     process.exit(0);
   }
-  const oracleUrl = values["oracle-url"];
+  const oracleUrl = positionals[0];
   if (!oracleUrl) {
-    console.log("--oracle-url is required");
+    console.log("<oracle-url> is required");
     printHelp();
     process.exit(1);
   }
 
+  const network = await NetworkConfig.fromArgs(values.config, values.chain);
+  const nodeUrl = network.getNodeUrl();
   const quote = await new SignerClient(oracleUrl).quote();
   await handleTx(
-    registerQuote(
-      quote,
-      quotesWallet.address(values.chain),
-      values.chain,
-      treasury.seed,
-    ),
+    registerQuote(quote, network.dApps.quotes, network.chainId, wallet.seed),
     Boolean(values.apply),
+    nodeUrl,
   );
 }
 
@@ -77,16 +76,13 @@ async function list(rest: string[]) {
   const { values } = parseArgs({
     args: rest,
     options: {
-      "oracle-url": {
+      config: {
         type: "string",
-        default: process.env["ORACLE_URL"],
+        default: "./config.json",
       },
       chain: {
         type: "string",
         default: "R",
-      },
-      apply: {
-        type: "boolean",
       },
       help: {
         type: "boolean",
@@ -97,6 +93,7 @@ async function list(rest: string[]) {
   function printHelp() {
     console.log(
       `Usage: ${process.argv[0]} ${process.argv[1]} list [options]
+     --config <path>     Path to config.json. Default: ./config.json
      --chain <id>        Chain ID. Default: R
  -h, --help              Show this help message and exit`,
     );
@@ -105,7 +102,9 @@ async function list(rest: string[]) {
     printHelp();
     process.exit(0);
   }
-  const quotes = await fetchQuotes(quotesWallet.address(values.chain), nodeUrl);
+  const network = await NetworkConfig.fromArgs(values.config, values.chain);
+  const nodeUrl = network.getNodeUrl();
+  const quotes = await fetchQuotes(network.dApps.quotes, nodeUrl);
   for (const quote of quotes) {
     console.log(`- Id: ${base58Encode(quote.id)}
   Quote:

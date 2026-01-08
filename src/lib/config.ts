@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { ANY_TD_ADDRESS, FullPoolId } from "./models.js";
+import { asOptionalStringArg } from "./utils.js";
 
 export class Config {
   constructor(public readonly networks: Record<string, JsonNetworkConfig>) {}
@@ -41,6 +42,15 @@ export class NetworkConfig {
     public readonly dApps: JsonDApps,
     public readonly pools: Record<string, Record<string, JsonPoolConfig>>,
   ) {}
+
+  static async fromArgs(
+    config: string | boolean | undefined,
+    chainId: string | boolean | undefined,
+  ) {
+    return (
+      await Config.fromFile(asOptionalStringArg(config) ?? "./config.json")
+    ).forChain(asOptionalStringArg(chainId) ?? "R");
+  }
 
   getNodeUrl() {
     const nodeUrl = this.findNodeUrl();
@@ -87,6 +97,9 @@ type JsonNetworkConfig = {
 };
 
 type JsonDApps = {
+  attestedPools: string;
+  privatePools: string;
+  quotes: string;
   requests: string;
   responses: string;
 };

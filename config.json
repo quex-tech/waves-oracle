@@ -3,12 +3,15 @@
     "R": {
       "nodeUrls": ["http://localhost:6869/"],
       "dApps": {
-        "requests": "3M3hcSBqTF5SJxespKA13S6y6nFS9zA2eJX",
-        "responses": "3MJfAPuSQgQSB1AcUHHFzRUjMpx7j35YsQv"
+        "attestedPools": "3MGqWUDyZuENhGUK7MqcavBbgtTgfMeDzUW",
+        "privatePools": "3MJfAPuSQgQSB1AcUHHFzRUjMpx7j35YsQv",
+        "quotes": "3M3hcSBqTF5SJxespKA13S6y6nFS9zA2eJX",
+        "requests": "3M9KRgzrYgRNP6Ddg6V5mT1otM6fmURGN1T",
+        "responses": "3MG4iWUwv79zHPbuAoMs3rRUM4cb8LnhxuT"
       },
       "pools": {
-        "3MGqWUDyZuENhGUK7MqcavBbgtTgfMeDzUW": {
-          "": {
+        "3MJfAPuSQgQSB1AcUHHFzRUjMpx7j35YsQv": {
+          "01522789c985d35d67d685dc0e98ba2f216d86be8fbc0680a630": {
             "addresses": {
               "0x769A785Ee2b0E648C65E21cB14372c9D9e816b7d": {
                 "urls": ["http://10.13.192.142:8080/"]
@@ -16,7 +19,7 @@
             }
           }
         },
-        "3MG4iWUwv79zHPbuAoMs3rRUM4cb8LnhxuT": {
+        "3MGqWUDyZuENhGUK7MqcavBbgtTgfMeDzUW": {
           "0152589d492ecc97cfa5250814633e875a06dd2652a9106f48c60eead84301f9bd084dcd0ffadd54b6179232082bea2a217f4d6f7590a58ba9f4": {
             "addresses": {
               "0x769A785Ee2b0E648C65E21cB14372c9D9e816b7d": {

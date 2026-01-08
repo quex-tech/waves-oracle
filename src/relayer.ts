@@ -4,7 +4,7 @@ import { Config } from "./lib/config.js";
 import { fetchRequests, fulfillRequest } from "./lib/requests.js";
 import { SignerClient } from "./lib/signer.js";
 import { handleTx, wvs } from "./lib/utils.js";
-import { treasury } from "./lib/wallets.js";
+import { wallet } from "./lib/wallets.js";
 
 const MIN_REWARD = 0.001 * wvs;
 const FEE = 0.005 * wvs;
@@ -68,7 +68,7 @@ for (const chainId of Object.keys(config.networks)) {
 
     const res = await signerClient.query(
       req.action,
-      base58Decode(treasury.address(chainId)),
+      base58Decode(wallet.address(chainId)),
     );
 
     try {
@@ -80,9 +80,10 @@ for (const chainId of Object.keys(config.networks)) {
           req.txId,
           network.dApps.requests,
           chainId,
-          treasury.seed,
+          wallet.seed,
         ),
         Boolean(values.apply),
+        nodeUrl,
       );
     } catch (e) {
       console.log(e);

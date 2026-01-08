@@ -2,8 +2,12 @@ import { keygen } from "@noble/secp256k1";
 import { base58Decode, base58Encode } from "@waves/ts-lib-crypto";
 import { parseArgs } from "node:util";
 import { parseHttpAction } from "./httpAction.js";
-import { FullPoolId, HttpActionWithProof } from "./lib/models.js";
-import { nodeUrl } from "./lib/network.js";
+import { NetworkConfig } from "./lib/config.js";
+import {
+  ANY_TD_ADDRESS,
+  FullPoolId,
+  HttpActionWithProof,
+} from "./lib/models.js";
 import {
   addRequest,
   fetchRequests,
@@ -12,13 +16,8 @@ import {
   recycleRequest,
 } from "./lib/requests.js";
 import { SignerClient } from "./lib/signer.js";
-import {
-  asOptionalStringArg,
-  asStringArg,
-  handleTx,
-  wvs,
-} from "./lib/utils.js";
-import { privatePools, requests, responses, treasury } from "./lib/wallets.js";
+import { asOptionalStringArg, handleTx, wvs } from "./lib/utils.js";
+import { wallet } from "./lib/wallets.js";
 
 const [command, ...rest] = process.argv.slice(2);
 
@@ -46,6 +45,10 @@ async function list(rest: string[]) {
   const { values } = parseArgs({
     args: rest,
     options: {
+      config: {
+        type: "string",
+        default: "./config.json",
+      },
       chain: {
         type: "string",
         default: "R",
@@ -60,6 +63,7 @@ async function list(rest: string[]) {
   function printHelp() {
     console.log(
       `Usage: ${process.argv[0]} ${process.argv[1]} list [options]
+     --config <path>     Path to config.json. Default: ./config.json
      --chain <id>        Chain ID. Default: R
  -h, --help              Show this help message and exit`,
     );
@@ -69,8 +73,10 @@ async function list(rest: string[]) {
     printHelp();
     process.exit(0);
   }
+  const network = await NetworkConfig.fromArgs(values.config, values.chain);
+  const nodeUrl = network.getNodeUrl();
   for (const req of await fetchRequests(
-    requests.address(values.chain),
+    network.dApps.requests,
     nodeUrl,
   )) {
     console.log(`- Key:                ${req.key}
@@ -110,16 +116,18 @@ async function list(rest: string[]) {
 async function add(rest: string[]) {
   const { values } = parseArgs({
     options: {
-      "oracle-url": {
-        type: "string",
-        default: process.env["ORACLE_URL"],
-      },
       "pool-addr": {
         type: "string",
       },
       "pool-id": {
         type: "string",
-        default: "",
+      },
+      "oracle-url": {
+        type: "string",
+      },
+      config: {
+        type: "string",
+        default: "./config.json",
       },
       chain: {
         type: "string",
@@ -150,9 +158,10 @@ async function add(rest: string[]) {
  -f, --filter                   jq filter to transform response body. Default: .
      --output-request <path>    Save base64-encoded request into a file
      --from-file <path>         Use request from file
-     --oracle-url <url>         Base URL of the oracle API
-     --pool-addr <address>      Address of the oracle pool script with isInPool method
-     --pool-id <address>        Pool ID in hex. Default: empty (pool is defined by the address)
+     --oracle-url <url>         Base URL of the oracle API. Default: from config
+     --pool-addr <address>      Address of the oracle pool script with isInPool method. Default: from config
+     --pool-id <address>        Pool ID in hex. Default: wallet address when using private pool
+     --config <path>            Path to config.json. Default: ./config.json
      --chain <id>               Chain ID. Default: R
      --apply                    Actually submit the transaction
  -h, --help                     Show this help message and exit`);
@@ -175,9 +184,32 @@ async function add(rest: string[]) {
     }
   })();
 
-  const oracleUrl = asOptionalStringArg(values["oracle-url"]);
+  const network = await NetworkConfig.fromArgs(values.config, values.chain);
+  const chainId = network.chainId;
+  const nodeUrl = network.getNodeUrl();
+
+  const poolAddress =
+    asOptionalStringArg(values["pool-addr"]) ?? network.dApps.privatePools;
+  const poolIdArg = asOptionalStringArg(values["pool-id"]);
+  const poolIdHex =
+    poolIdArg && poolIdArg.length
+      ? poolIdArg
+      : poolAddress === network.dApps.privatePools
+        ? Buffer.from(base58Decode(wallet.address(chainId))).toString("hex")
+        : "";
+  const fullPoolId = new FullPoolId(poolAddress, Buffer.from(poolIdHex, "hex"));
+
+  const oracleUrl =
+    asOptionalStringArg(values["oracle-url"]) ??
+    network
+      .forPool(fullPoolId)
+      .findOracleUrl(
+        action instanceof HttpActionWithProof
+          ? action.action.patch.tdAddress
+          : ANY_TD_ADDRESS,
+      );
   if (!oracleUrl) {
-    console.log("--oracle-url is required");
+    console.log("--oracle-url is required and was not found in config");
     printHelp();
     process.exit(1);
   }
@@ -193,24 +225,18 @@ async function add(rest: string[]) {
           .encrypt(tdPublicKey, await signerClient.address(), senderPrivKey)
           .addProof(tdPublicKey, senderPrivKey);
 
-  const chainId = asStringArg(values.chain);
-  const fullPoolId = new FullPoolId(
-    asStringArg(values["pool-addr"] ?? privatePools.address(chainId)),
-    Buffer.from(asStringArg(values["pool-id"]), "hex"),
-  );
-
   const tx = addRequest(
     actionWithProof,
-    responses.address(chainId),
+    network.dApps.responses,
     fullPoolId,
     Date.now(),
     0.01 * wvs,
-    requests.address(chainId),
-    asStringArg(values.chain),
-    treasury.seed,
+    network.dApps.requests,
+    chainId,
+    wallet.seed,
   );
 
-  await handleTx(tx, Boolean(values.apply));
+  await handleTx(tx, Boolean(values.apply), nodeUrl);
 
   console.log(
     `Key: ${fullPoolId.address}:${base58Encode(fullPoolId.id)}:${base58Encode(
@@ -225,6 +251,10 @@ async function recycle(rest: string[]) {
     options: {
       apply: {
         type: "boolean",
+      },
+      config: {
+        type: "string",
+        default: "./config.json",
       },
       chain: {
         type: "string",
@@ -241,6 +271,7 @@ async function recycle(rest: string[]) {
   function printHelp() {
     console.log(
       `Usage: ${process.argv[0]} ${process.argv[1]} recycle [options] <key>
+     --config <path>     Path to config.json. Default: ./config.json
      --chain <id>        Chain ID. Default: R
      --apply             Actually submit the transaction
  -h, --help              Show this help message and exit`,
@@ -258,14 +289,17 @@ async function recycle(rest: string[]) {
     process.exit(1);
   }
 
+  const network = await NetworkConfig.fromArgs(values.config, values.chain);
+  const nodeUrl = network.getNodeUrl();
   await handleTx(
     recycleRequest(
       positionals[0],
-      requests.address(values.chain),
-      values.chain,
-      treasury.seed,
+      network.dApps.requests,
+      network.chainId,
+      wallet.seed,
     ),
     Boolean(values.apply),
+    nodeUrl,
   );
 }
 
@@ -275,7 +309,10 @@ async function fulfill(rest: string[]) {
     options: {
       "oracle-url": {
         type: "string",
-        default: process.env["ORACLE_URL"],
+      },
+      config: {
+        type: "string",
+        default: "./config.json",
       },
       chain: {
         type: "string",
@@ -295,7 +332,8 @@ async function fulfill(rest: string[]) {
   function printHelp() {
     console.log(
       `Usage: ${process.argv[0]} ${process.argv[1]} fulfill [options] <key>
-     --oracle-url <url>  Base URL of the oracle API
+     --oracle-url <url>  Base URL of the oracle API. Default: from config
+     --config <path>     Path to config.json. Default: ./config.json
      --chain <id>        Chain ID. Default: R
      --apply             Actually submit the transaction
  -h, --help              Show this help message and exit`,
@@ -310,35 +348,41 @@ async function fulfill(rest: string[]) {
     printHelp();
     process.exit(1);
   }
-  const oracleUrl = values["oracle-url"];
-  if (!oracleUrl) {
-    console.log("--oracle-url is required");
-    printHelp();
-    process.exit(1);
-  }
+  const network = await NetworkConfig.fromArgs(values.config, values.chain);
+  const nodeUrl = network.getNodeUrl();
 
   const key = positionals[0];
-  const req = await findRequest(key, requests.address(values.chain), nodeUrl);
+  const req = await findRequest(key, network.dApps.requests, nodeUrl);
   if (!req) {
     throw new Error("Request is not found");
+  }
+
+  const oracleUrl =
+    asOptionalStringArg(values["oracle-url"]) ??
+    network.forPool(req.pool).findOracleUrl(req.action.action.patch.tdAddress);
+  if (!oracleUrl) {
+    console.log("--oracle-url is required and was not found in config");
+    printHelp();
+    process.exit(1);
   }
 
   const signerClient = new SignerClient(oracleUrl);
   const res = await signerClient.query(
     req.action,
-    base58Decode(treasury.address(values.chain)),
+    base58Decode(wallet.address(network.chainId)),
   );
 
   await handleTx(
     fulfillRequest(
       res,
-      req.responsesAddress,
+      network.dApps.responses,
       req.pool,
       req.txId,
-      requests.address(values.chain),
-      values.chain,
-      treasury.seed,
+      network.dApps.requests,
+      network.chainId,
+      wallet.seed,
     ),
     Boolean(values.apply),
+    nodeUrl,
   );
 }

@@ -1,10 +1,13 @@
 import { parseArgs } from "node:util";
-import { nodeUrl } from "./lib/network.js";
+import { NetworkConfig } from "./lib/config.js";
 import { fetchResponses } from "./lib/responses.js";
-import { responses } from "./lib/wallets.js";
 
 const { values } = parseArgs({
   options: {
+    config: {
+      type: "string",
+      default: "./config.json",
+    },
     chain: {
       type: "string",
       default: "R",
@@ -16,9 +19,11 @@ const { values } = parseArgs({
   },
 });
 
+const network = await NetworkConfig.fromArgs(values.config, values.chain);
+
 for (const res of await fetchResponses(
-  responses.address(values.chain),
-  nodeUrl,
+  network.dApps.responses,
+  network.getNodeUrl(),
 )) {
   console.log(`- Action ID:  ${res.actionId.toString("hex")}
   Pool:

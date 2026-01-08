@@ -1,9 +1,9 @@
 import { parseArgs } from "util";
-import { nodeUrl } from "./lib/network.js";
+import { NetworkConfig } from "./lib/config.js";
 import { addOracle, deleteOracle, fetchOracles } from "./lib/privatePools.js";
 import { SignerClient } from "./lib/signer.js";
 import { handleTx } from "./lib/utils.js";
-import { privatePools, treasury } from "./lib/wallets.js";
+import { wallet } from "./lib/wallets.js";
 
 const [command, ...rest] = process.argv.slice(2);
 
@@ -33,6 +33,10 @@ async function add(args: string[]) {
         type: "string",
         default: "",
       },
+      config: {
+        type: "string",
+        default: "./config.json",
+      },
       chain: {
         type: "string",
         default: "R",
@@ -48,6 +52,7 @@ async function add(args: string[]) {
     console.log(
       `Usage: ${process.argv[0]} ${process.argv[1]} add [options] <oracle-url>
      --pool-id-suffix <hex>  Optional pool ID suffix (hex)
+     --config <path>         Path to config.json. Default: ./config.json
      --chain <id>            Chain ID. Default: R
      --apply                 Actually submit the transactions
  -h, --help                  Show this help message and exit`,
@@ -63,15 +68,18 @@ async function add(args: string[]) {
     process.exit(1);
   }
 
+  const network = await NetworkConfig.fromArgs(values.config, values.chain);
+  const nodeUrl = network.getNodeUrl();
   await handleTx(
     addOracle(
-      privatePools.address(values.chain),
+      network.dApps.privatePools,
       Buffer.from(values["pool-id-suffix"], "hex"),
       await new SignerClient(positionals[0]).publicKey(),
-      values.chain,
-      treasury,
+      network.chainId,
+      wallet,
     ),
     Boolean(values.apply),
+    nodeUrl,
   );
 }
 
@@ -85,6 +93,10 @@ async function del(args: string[]) {
       "pool-id-suffix": {
         type: "string",
         default: "",
+      },
+      config: {
+        type: "string",
+        default: "./config.json",
       },
       chain: {
         type: "string",
@@ -101,6 +113,7 @@ async function del(args: string[]) {
     console.log(
       `Usage: ${process.argv[0]} ${process.argv[1]} delete [options] <oracle-url>
      --pool-id-suffix <hex>  Optional pool ID suffix (hex)
+     --config <path>         Path to config.json. Default: ./config.json
      --chain <id>            Chain ID. Default: R
      --apply                 Actually submit the transactions
  -h, --help                  Show this help message and exit`,
@@ -116,15 +129,18 @@ async function del(args: string[]) {
     process.exit(1);
   }
 
+  const network = await NetworkConfig.fromArgs(values.config, values.chain);
+  const nodeUrl = network.getNodeUrl();
   await handleTx(
     deleteOracle(
-      privatePools.address(values.chain),
+      network.dApps.privatePools,
       Buffer.from(values["pool-id-suffix"], "hex"),
       await new SignerClient(positionals[0]).publicKey(),
-      values.chain,
-      treasury,
+      network.chainId,
+      wallet,
     ),
     Boolean(values.apply),
+    nodeUrl,
   );
 }
 
@@ -132,6 +148,10 @@ async function list(args: string[]) {
   const { values } = parseArgs({
     args: args,
     options: {
+      config: {
+        type: "string",
+        default: "./config.json",
+      },
       chain: {
         type: "string",
         default: "R",
@@ -145,6 +165,7 @@ async function list(args: string[]) {
   function printHelp() {
     console.log(
       `Usage: ${process.argv[0]} ${process.argv[1]} list [options]
+     --config <path>        Path to config.json. Default: ./config.json
      --chain <id>           Chain ID. Default: R
  -h, --help                 Show this help message and exit`,
     );
@@ -154,8 +175,13 @@ async function list(args: string[]) {
     process.exit(0);
   }
 
-  const privateOracles = await fetchOracles(privatePools.address(values.chain), nodeUrl);
-  console.log(`Pool Address:    ${privatePools.address(values.chain)}
+  const network = await NetworkConfig.fromArgs(values.config, values.chain);
+  const nodeUrl = network.getNodeUrl();
+  const privateOracles = await fetchOracles(
+    network.dApps.privatePools,
+    nodeUrl,
+  );
+  console.log(`Pool Address:    ${network.dApps.privatePools}
 Oracles:`);
   for (const oracle of privateOracles) {
     console.log(`- Public Key:  ${oracle.publicKey.toString("hex")}

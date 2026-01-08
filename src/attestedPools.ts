@@ -1,9 +1,9 @@
 import { parseArgs } from "util";
 import { addOracle, fetchOracles } from "./lib/attestedPools.js";
-import { nodeUrl } from "./lib/network.js";
+import { NetworkConfig } from "./lib/config.js";
 import { SignerClient } from "./lib/signer.js";
 import { handleTx } from "./lib/utils.js";
-import { attestedPools, quotes, treasury } from "./lib/wallets.js";
+import { wallet } from "./lib/wallets.js";
 
 const [command, ...rest] = process.argv.slice(2);
 
@@ -15,7 +15,7 @@ switch (command) {
     await list(rest);
     break;
   default:
-    console.log(`Usage: ${process.argv[0]} ${process.argv[1]} add|delete|list`);
+    console.log(`Usage: ${process.argv[0]} ${process.argv[1]} add|list`);
     break;
 }
 
@@ -25,6 +25,10 @@ async function add(args: string[]) {
     options: {
       apply: {
         type: "boolean",
+      },
+      config: {
+        type: "string",
+        default: "./config.json",
       },
       chain: {
         type: "string",
@@ -55,17 +59,21 @@ async function add(args: string[]) {
     process.exit(1);
   }
 
+  const network = await NetworkConfig.fromArgs(values.config, values.chain);
+  const nodeUrl = network.getNodeUrl();
+
   const quote = await new SignerClient(positionals[0]).quote();
 
   await handleTx(
     addOracle(
-      quotes.address(values.chain),
+      network.dApps.quotes,
       quote.getQuoteId(),
-      attestedPools.address(values.chain),
-      values.chain,
-      treasury,
+      network.dApps.attestedPools,
+      network.chainId,
+      wallet,
     ),
     Boolean(values.apply),
+    nodeUrl,
   );
 }
 
@@ -73,6 +81,10 @@ async function list(args: string[]) {
   const { values } = parseArgs({
     args: args,
     options: {
+      config: {
+        type: "string",
+        default: "./config.json",
+      },
       chain: {
         type: "string",
         default: "R",
@@ -86,6 +98,7 @@ async function list(args: string[]) {
   function printHelp() {
     console.log(
       `Usage: ${process.argv[0]} ${process.argv[1]} list [options]
+     --config <path>        Path to config.json. Default: ./config.json
      --chain <id>           Chain ID. Default: R
  -h, --help                 Show this help message and exit`,
     );
@@ -95,11 +108,14 @@ async function list(args: string[]) {
     process.exit(0);
   }
 
+  const network = await NetworkConfig.fromArgs(values.config, values.chain);
+  const nodeUrl = network.getNodeUrl();
+
   const attestedOracles = await fetchOracles(
-    attestedPools.address(values.chain),
+    network.dApps.attestedPools,
     nodeUrl,
   );
-  console.log(`Pool Address:    ${attestedPools.address(values.chain)}
+  console.log(`Pool Address:    ${network.dApps.attestedPools}
 Oracles:`);
   for (const oracle of attestedOracles) {
     console.log(`- Public Key:      ${oracle.publicKey.toString("hex")}

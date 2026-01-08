@@ -3,25 +3,11 @@ import {
   balance,
   scriptInfo,
 } from "@waves/waves-transactions/dist/nodeInteraction.js";
+import fs from "fs";
 import { parseArgs } from "node:util";
-import { nodeUrl } from "./lib/network.js";
+import { NetworkConfig } from "./lib/config.js";
 import { handleTx, removePrefix, wvs } from "./lib/utils.js";
-import {
-  attestedPools as attestedPoolsWallet,
-  privatePools as privatePoolsWallet,
-  quotes as quotesWallet,
-  requests as requestsWallet,
-  responses as responsesWallet,
-  treasury,
-  Wallet,
-} from "./lib/wallets.js";
-import {
-  attestedPools as attestedPoolsScript,
-  privatePools as privatePoolsScript,
-  quotes as quotesScript,
-  requests as requestsScript,
-  responses as responsesScript,
-} from "./scripts.js";
+import { IWallet, wallet } from "./lib/wallets.js";
 
 const { values } = parseArgs({
   options: {
@@ -29,23 +15,67 @@ const { values } = parseArgs({
       type: "string",
       default: "R",
     },
+    config: {
+      type: "string",
+      default: "./config.json",
+    },
     apply: {
       type: "boolean",
     },
   },
 });
 
-await fund(privatePoolsWallet.address(values.chain), 0.01 * wvs, 0.0025 * wvs);
-await fund(responsesWallet.address(values.chain), 0.01 * wvs, 0.0025 * wvs);
-await fund(requestsWallet.address(values.chain), 0.01 * wvs, 0.0025 * wvs);
-await fund(quotesWallet.address(values.chain), 0.01 * wvs, 0.0025 * wvs);
-await fund(attestedPoolsWallet.address(values.chain), 0.01 * wvs, 0.0025 * wvs);
+const network = await NetworkConfig.fromArgs(values.config, values.chain);
+const chainId = network.chainId;
+const nodeUrl = network.getNodeUrl();
 
-await deployScript(privatePoolsWallet, privatePoolsScript);
-await deployScript(responsesWallet, responsesScript);
-await deployScript(requestsWallet, requestsScript);
-await deployScript(quotesWallet, quotesScript);
-await deployScript(attestedPoolsWallet, attestedPoolsScript);
+const scripts = {
+  attestedPools: await compileRide("./src/ride/attested-pools.ride"),
+  privatePools: await compileRide("./src/ride/private-pools.ride"),
+  quotes: await compileRide("./src/ride/quotes.ride"),
+  requests: await compileRide("./src/ride/requests.ride"),
+  responses: await compileRide("./src/ride/responses.ride"),
+};
+
+const wallets = {
+  attestedPools: wallet.derive(1),
+  privatePools: wallet.derive(2),
+  quotes: wallet.derive(3),
+  requests: wallet.derive(4),
+  responses: wallet.derive(5),
+};
+
+const dApps = {
+  attestedPools: wallets.attestedPools.address(chainId),
+  privatePools: wallets.privatePools.address(chainId),
+  quotes: wallets.quotes.address(chainId),
+  requests: wallets.requests.address(chainId),
+  responses: wallets.responses.address(chainId),
+};
+
+await fund(dApps.attestedPools, 0.01 * wvs, 0.0025 * wvs);
+await fund(dApps.privatePools, 0.01 * wvs, 0.0025 * wvs);
+await fund(dApps.quotes, 0.01 * wvs, 0.0025 * wvs);
+await fund(dApps.requests, 0.01 * wvs, 0.0025 * wvs);
+await fund(dApps.responses, 0.01 * wvs, 0.0025 * wvs);
+
+await deployScript(wallets.attestedPools, scripts.attestedPools);
+await deployScript(wallets.privatePools, scripts.privatePools);
+await deployScript(wallets.quotes, scripts.quotes);
+await deployScript(wallets.requests, scripts.requests);
+await deployScript(wallets.responses, scripts.responses);
+
+console.log(
+  JSON.stringify(
+    {
+      [chainId]: {
+        dApps: dApps,
+      },
+    },
+    undefined,
+    "  ",
+  ),
+);
 
 async function fund(address: string, amount: number, ifLess: number) {
   const oracleBalance = await balance(address, nodeUrl);
@@ -55,17 +85,18 @@ async function fund(address: string, amount: number, ifLess: number) {
         {
           recipient: address,
           amount: amount,
-          chainId: values.chain,
+          chainId: chainId,
         },
-        treasury.seed,
+        wallet.seed,
       ),
       Boolean(values.apply),
+      nodeUrl,
     );
   }
 }
 
-async function deployScript(wallet: Wallet, script: string) {
-  const info = (await scriptInfo(wallet.address(values.chain), nodeUrl)) as {
+async function deployScript(wallet: IWallet, script: string) {
+  const info = (await scriptInfo(wallet.address(chainId), nodeUrl)) as {
     script?: string;
   };
 
@@ -76,14 +107,45 @@ async function deployScript(wallet: Wallet, script: string) {
     return;
   }
 
+  console.log(removePrefix(info.script ?? "", "base64:"));
+  console.log(removePrefix(script, "base64:"));
+
   await handleTx(
     setScript(
       {
         script: script,
-        chainId: values.chain,
+        chainId: chainId,
       },
       wallet.seed,
     ),
     Boolean(values.apply),
+    nodeUrl,
   );
+}
+
+type CompilationResult = {
+  script: string;
+  complexity: number;
+  verifierComplexity: number;
+  callableComplexities: Record<string, number>;
+  extraFee: number;
+};
+
+async function compileRide(path: string): Promise<string> {
+  const script = fs.readFileSync(path, "utf-8");
+  const res = await fetch(
+    new URL("/utils/script/compileCode?compact=true", nodeUrl),
+    {
+      method: "POST",
+      headers: { "Content-Type": "text/plain", Accept: "application/json" },
+      body: script,
+    },
+  );
+  if (!res.ok) {
+    throw new Error(
+      `Failed to compile script: ${res.status} ${res.statusText}`,
+    );
+  }
+  const compilation = (await res.json()) as CompilationResult;
+  return compilation.script;
 }

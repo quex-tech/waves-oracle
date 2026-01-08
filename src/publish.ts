@@ -3,15 +3,16 @@ import { base58Decode } from "@waves/ts-lib-crypto";
 import fs from "fs";
 import { parseArgs } from "node:util";
 import { parseHttpAction } from "./httpAction.js";
-import { FullPoolId, HttpActionWithProof } from "./lib/models.js";
+import { NetworkConfig } from "./lib/config.js";
+import {
+  ANY_TD_ADDRESS,
+  FullPoolId,
+  HttpActionWithProof,
+} from "./lib/models.js";
 import { publishResponse } from "./lib/responses.js";
 import { SignerClient } from "./lib/signer.js";
-import { asStringArg, handleTx } from "./lib/utils.js";
-import {
-  privatePools,
-  responses as responsesWallet,
-  treasury,
-} from "./lib/wallets.js";
+import { asOptionalStringArg, asStringArg, handleTx } from "./lib/utils.js";
+import { wallet } from "./lib/wallets.js";
 
 const { values } = parseArgs({
   options: {
@@ -20,14 +21,16 @@ const { values } = parseArgs({
     },
     "oracle-url": {
       type: "string",
-      default: process.env["ORACLE_URL"],
     },
     "pool-addr": {
-      type: "string"
+      type: "string",
     },
     "pool-id": {
       type: "string",
-      default: "",
+    },
+    config: {
+      type: "string",
+      default: "./config.json",
     },
     chain: {
       type: "string",
@@ -61,7 +64,37 @@ const action = (function () {
   }
 })();
 
-const signerClient = new SignerClient(asStringArg(values["oracle-url"] || ""));
+const network = await NetworkConfig.fromArgs(values.config, values.chain);
+const chainId = network.chainId;
+const nodeUrl = network.getNodeUrl();
+
+const poolAddress =
+  asOptionalStringArg(values["pool-addr"]) ?? network.dApps.privatePools;
+const poolIdArg = asOptionalStringArg(values["pool-id"]);
+const poolIdHex =
+  poolIdArg && poolIdArg.length
+    ? poolIdArg
+    : poolAddress === network.dApps.privatePools
+      ? Buffer.from(base58Decode(wallet.address(chainId))).toString("hex")
+      : "";
+const fullPoolId = new FullPoolId(poolAddress, Buffer.from(poolIdHex, "hex"));
+
+const oracleUrl =
+  asOptionalStringArg(values["oracle-url"]) ??
+  network
+    .forPool(fullPoolId)
+    .findOracleUrl(
+      action instanceof HttpActionWithProof
+        ? action.action.patch.tdAddress
+        : ANY_TD_ADDRESS,
+    );
+if (!oracleUrl) {
+  console.log("--oracle-url is required and was not found in config");
+  printHelp();
+  process.exit(1);
+}
+
+const signerClient = new SignerClient(oracleUrl);
 
 const tdPublicKey = await signerClient.publicKey();
 const senderPrivKey = keygen().secretKey;
@@ -77,27 +110,23 @@ if (values["output-request"]) {
   const encodedAction = actionWithProof.toBytes().toString("base64");
   fs.writeFileSync(asStringArg(values["output-request"]), encodedAction);
 }
-const chainId = asStringArg(values.chain);
+
 const res = await signerClient.query(
   actionWithProof,
-  base58Decode(treasury.address(chainId)),
+  base58Decode(wallet.address(chainId)),
 );
 console.log(res);
-
-const fullPoolId = new FullPoolId(
-  asStringArg(values["pool-addr"] ?? privatePools.address(chainId)),
-  Buffer.from(asStringArg(values["pool-id"]), "hex"),
-);
 
 await handleTx(
   publishResponse(
     res,
     fullPoolId,
-    responsesWallet.address(chainId),
+    network.dApps.responses,
     chainId,
-    treasury.seed,
+    wallet.seed,
   ),
   Boolean(values.apply),
+  nodeUrl,
 );
 
 function printHelp() {
@@ -114,9 +143,10 @@ function printHelp() {
  -f, --filter                   jq filter to transform response body. Default: .
      --output-request <path>    Save base64-encoded request into a file
      --from-file <path>         Use request from file
-     --oracle-url <url>         Base URL of the oracle API
-     --pool-addr <address>      Address of the oracle pool script with isInPool method
-     --pool-id <address>        Pool ID in hex. Default: empty (pool is defined by the address)
+     --oracle-url <url>         Base URL of the oracle API. Default: from config
+     --pool-addr <address>      Address of the oracle pool script with isInPool method. Default: private pool from config
+     --pool-id <address>        Pool ID in hex. Default: wallet address when using private pool
+     --config <path>            Path to config.json. Default: ./config.json
      --chain <id>               Chain ID. Default: R
      --apply                    Actually submit the transaction
  -h, --help                     Show this help message and exit`);

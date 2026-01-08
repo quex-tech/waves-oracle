@@ -2,7 +2,7 @@ import { base58Decode, base58Encode } from "@waves/ts-lib-crypto";
 import { invokeScript } from "@waves/waves-transactions";
 import { accountData } from "@waves/waves-transactions/dist/nodeInteraction.js";
 import { FullPoolId } from "./models.js";
-import { Wallet } from "./wallets.js";
+import { IWallet } from "./wallets.js";
 
 type PrivateOracle = {
   ownerAddress: string;
@@ -25,7 +25,7 @@ export function addOracle(
   poolIdSuffix: Buffer,
   publicKey: Buffer,
   chainId: string,
-  wallet: Wallet,
+  wallet: IWallet,
 ) {
   return invokeScript(
     {
@@ -54,7 +54,7 @@ export function deleteOracle(
   poolIdSuffix: Buffer,
   publicKey: Buffer,
   chainId: string,
-  wallet: Wallet,
+  wallet: IWallet,
 ) {
   return invokeScript(
     {

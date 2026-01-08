@@ -1,23 +1,41 @@
-import { crypto, seedWithNonce } from "@waves/ts-lib-crypto";
+import { crypto, INonceSeed, seedWithNonce } from "@waves/ts-lib-crypto";
 import { TSeedTypes } from "@waves/waves-transactions";
 import { getEnvVar } from "./utils.js";
 
-export type Wallet = {
+export interface IWallet {
   address: (chainId: string) => string;
   seed: TSeedTypes;
-};
-
-const seed = getEnvVar("SEED");
-
-export const treasury = deriveWallet(0);
-export const privatePools = deriveWallet(1);
-export const responses = deriveWallet(2);
-export const requests = deriveWallet(3);
-export const quotes = deriveWallet(4);
-export const attestedPools = deriveWallet(5);
-
-function deriveWallet(index: number): Wallet {
-  const s = seedWithNonce(seed, index);
-  const c = crypto({ seed: s, output: "Base58" });
-  return { address: c.address, seed: { privateKey: c.privateKey() } };
 }
+
+class RootWallet implements IWallet {
+  constructor(private readonly originalSeed: string) {}
+
+  get seed(): TSeedTypes {
+    return this.originalSeed;
+  }
+
+  address(chainId: string) {
+    const c = crypto({ seed: this.originalSeed, output: "Base58" });
+    return c.address(chainId);
+  }
+
+  derive(index: number) {
+    return new DerivedWallet(seedWithNonce(this.originalSeed, index));
+  }
+}
+
+class DerivedWallet implements IWallet {
+  constructor(private readonly originalSeed: INonceSeed) {}
+
+  get seed(): TSeedTypes {
+    const c = crypto({ seed: this.originalSeed, output: "Base58" });
+    return { privateKey: c.privateKey() };
+  }
+
+  address(chainId: string) {
+    const c = crypto({ seed: this.originalSeed, output: "Base58" });
+    return c.address(chainId);
+  }
+}
+
+export const wallet = new RootWallet(getEnvVar("SEED"));

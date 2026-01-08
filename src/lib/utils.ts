@@ -5,7 +5,6 @@ import {
   WithId,
 } from "@waves/ts-types";
 import { broadcast, waitForTx } from "@waves/waves-transactions";
-import { nodeUrl } from "./network.js";
 
 export const wvs = 10 ** 8;
 
@@ -26,6 +25,7 @@ export function getEnvVar(name: string) {
 export async function handleTx(
   tx: SignedTransaction<Transaction> & WithId,
   apply: boolean,
+  nodeUrl: string,
 ) {
   console.log("Transaction:", tx);
   if (!apply) {
