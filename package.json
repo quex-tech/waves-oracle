@@ -8,7 +8,8 @@
   "scripts": {
     "build": "tsc",
     "lint": "eslint \"src/**/*.{ts,js}\"",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "test": "tsc -p tsconfig.test.json && node --test dist-test/test/*.test.js"
   },
   "dependencies": {
     "@noble/secp256k1": "^3.0.0",
