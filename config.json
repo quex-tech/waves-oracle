@@ -1,10 +1,11 @@
 {
-  "networks": [
-    {
-      "chainId": "R",
+  "networks": {
+    "R": {
       "nodeUrls": ["http://localhost:6869/"],
-      "requestsAddress": "3M3hcSBqTF5SJxespKA13S6y6nFS9zA2eJX",
-      "responsesAddress": "3MJfAPuSQgQSB1AcUHHFzRUjMpx7j35YsQv",
+      "dApps": {
+        "requests": "3M3hcSBqTF5SJxespKA13S6y6nFS9zA2eJX",
+        "responses": "3MJfAPuSQgQSB1AcUHHFzRUjMpx7j35YsQv"
+      },
       "pools": {
         "3MGqWUDyZuENhGUK7MqcavBbgtTgfMeDzUW": {
           "": {
@@ -26,5 +27,5 @@
         }
       }
     }
-  ]
+  }
 }
