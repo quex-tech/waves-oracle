@@ -7,7 +7,7 @@ import {
 import fs from "fs";
 import { join } from "node:path";
 import { removePrefix, wvs } from "./utils.js";
-import { IWallet, wallet } from "./wallets.js";
+import { IWallet, RootWallet } from "./wallets.js";
 
 export type DApps = {
   attestedPools: string;
@@ -23,6 +23,7 @@ export type DeployResult = {
 };
 
 export async function deployDApps(
+  wallet: RootWallet,
   chainId: string,
   nodeUrl: string,
   srcDirPath: string,
@@ -61,11 +62,11 @@ export async function deployDApps(
   const amount = 0.01 * wvs;
   const ifLess = 0.0025 * wvs;
   const fundTxs = await Promise.all([
-    fund(dApps.attestedPools, amount, ifLess, nodeUrl, chainId),
-    fund(dApps.privatePools, amount, ifLess, nodeUrl, chainId),
-    fund(dApps.quotes, amount, ifLess, nodeUrl, chainId),
-    fund(dApps.requests, amount, ifLess, nodeUrl, chainId),
-    fund(dApps.responses, amount, ifLess, nodeUrl, chainId),
+    fund(wallet, dApps.attestedPools, amount, ifLess, nodeUrl, chainId),
+    fund(wallet, dApps.privatePools, amount, ifLess, nodeUrl, chainId),
+    fund(wallet, dApps.quotes, amount, ifLess, nodeUrl, chainId),
+    fund(wallet, dApps.requests, amount, ifLess, nodeUrl, chainId),
+    fund(wallet, dApps.responses, amount, ifLess, nodeUrl, chainId),
   ]);
 
   for (const tx of fundTxs) {
@@ -97,6 +98,7 @@ export async function deployDApps(
 }
 
 async function fund(
+  wallet: RootWallet,
   address: string,
   amount: number,
   ifLess: number,

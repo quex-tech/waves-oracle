@@ -6,7 +6,7 @@ export interface IWallet {
   seed: TSeedTypes;
 }
 
-class RootWallet implements IWallet {
+export class RootWallet implements IWallet {
   constructor(private readonly originalSeed: string) {}
 
   get seed(): TSeedTypes {

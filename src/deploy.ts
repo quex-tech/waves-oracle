@@ -2,6 +2,7 @@ import { parseArgs } from "node:util";
 import { handleTx } from "./cliUtils.js";
 import { NetworkConfig } from "./lib/config.js";
 import { deployDApps } from "./lib/deploy.js";
+import { wallet } from "./lib/wallets.js";
 
 const { values } = parseArgs({
   options: {
@@ -45,7 +46,12 @@ const nodeUrl = network.getNodeUrl();
 const srcDirPath = values["src-path"];
 
 const apply = Boolean(values.apply);
-const { dApps, txs } = await deployDApps(chainId, nodeUrl, srcDirPath);
+const { dApps, txs } = await deployDApps(
+  wallet,
+  chainId,
+  nodeUrl,
+  srcDirPath,
+);
 for (const tx of txs) {
   await handleTx(tx, apply, nodeUrl);
 }
