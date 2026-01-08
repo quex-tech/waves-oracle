@@ -40,22 +40,6 @@ export async function handleTx(
   console.log("Transaction confirmed.");
 }
 
-export function asOptionalStringArg(
-  val: string | boolean | undefined,
-): string | undefined {
-  if (typeof val === "string") {
-    return val;
-  }
-  return undefined;
-}
-
-export function asStringArg(val: string | boolean): string {
-  if (typeof val === "string") {
-    return val;
-  }
-  return "";
-}
-
 export function parseBinaryEntry(entry: DataTransactionEntry) {
   if (entry.type !== "binary") {
     throw Error("Invalid binary entry");

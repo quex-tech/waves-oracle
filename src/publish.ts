@@ -2,7 +2,7 @@ import { keygen } from "@noble/secp256k1";
 import { base58Decode } from "@waves/ts-lib-crypto";
 import fs from "fs";
 import { parseArgs } from "node:util";
-import { parseHttpAction } from "./httpAction.js";
+import { httpActionOptions, parseHttpAction } from "./httpAction.js";
 import { NetworkConfig } from "./lib/config.js";
 import {
   ANY_TD_ADDRESS,
@@ -11,10 +11,10 @@ import {
 } from "./lib/models.js";
 import { publishResponse } from "./lib/responses.js";
 import { SignerClient } from "./lib/signer.js";
-import { asOptionalStringArg, asStringArg, handleTx } from "./lib/utils.js";
+import { handleTx } from "./lib/utils.js";
 import { wallet } from "./lib/wallets.js";
 
-const { values } = parseArgs({
+const { values, positionals } = parseArgs({
   options: {
     "output-request": {
       type: "string",
@@ -43,8 +43,9 @@ const { values } = parseArgs({
       type: "boolean",
       short: "h",
     },
+    ...httpActionOptions,
   },
-  strict: false,
+  allowPositionals: true,
 });
 
 if (values.help) {
@@ -54,7 +55,7 @@ if (values.help) {
 
 const action = (function () {
   try {
-    return parseHttpAction(process.argv.slice(2));
+    return parseHttpAction(values, positionals);
   } catch (e) {
     if (e instanceof Error) {
       console.log(e.message);
@@ -68,9 +69,8 @@ const network = await NetworkConfig.fromArgs(values.config, values.chain);
 const chainId = network.chainId;
 const nodeUrl = network.getNodeUrl();
 
-const poolAddress =
-  asOptionalStringArg(values["pool-addr"]) ?? network.dApps.privatePools;
-const poolIdArg = asOptionalStringArg(values["pool-id"]);
+const poolAddress = values["pool-addr"] ?? network.dApps.privatePools;
+const poolIdArg = values["pool-id"];
 const poolIdHex =
   poolIdArg && poolIdArg.length
     ? poolIdArg
@@ -80,7 +80,7 @@ const poolIdHex =
 const fullPoolId = new FullPoolId(poolAddress, Buffer.from(poolIdHex, "hex"));
 
 const oracleUrl =
-  asOptionalStringArg(values["oracle-url"]) ??
+  values["oracle-url"] ??
   network
     .forPool(fullPoolId)
     .findOracleUrl(
@@ -108,7 +108,7 @@ const actionWithProof =
 
 if (values["output-request"]) {
   const encodedAction = actionWithProof.toBytes().toString("base64");
-  fs.writeFileSync(asStringArg(values["output-request"]), encodedAction);
+  fs.writeFileSync(values["output-request"], encodedAction);
 }
 
 const res = await signerClient.query(

@@ -1,5 +1,4 @@
 import fs from "fs";
-import { parseArgs } from "node:util";
 import {
   HttpActionWithProof,
   HttpRequest,
@@ -7,57 +6,62 @@ import {
   UnencryptedHttpAction,
   UnencryptedHttpPrivatePatch,
 } from "./lib/models.js";
-import { asOptionalStringArg, asStringArg } from "./lib/utils.js";
 
-export function parseHttpAction(args: string[]) {
-  const { values, positionals } = parseArgs({
-    args: args,
-    options: {
-      request: {
-        type: "string",
-        default: "GET",
-        short: "X",
-      },
-      header: {
-        type: "string",
-        multiple: true,
-        short: "H",
-      },
-      data: {
-        type: "string",
-        short: "d",
-      },
-      "enc-url-suffix": {
-        type: "string",
-      },
-      "enc-header": {
-        type: "string",
-        multiple: true,
-      },
-      "enc-data": {
-        type: "string",
-      },
-      filter: {
-        type: "string",
-        short: "f",
-        default: ".",
-      },
-      "from-file": {
-        type: "string",
-      },
-    },
-    strict: false,
-  });
+export const httpActionOptions = {
+  request: {
+    type: "string",
+    default: "GET",
+    short: "X",
+  },
+  header: {
+    type: "string",
+    multiple: true,
+    short: "H",
+  },
+  data: {
+    type: "string",
+    short: "d",
+  },
+  "enc-url-suffix": {
+    type: "string",
+  },
+  "enc-header": {
+    type: "string",
+    multiple: true,
+  },
+  "enc-data": {
+    type: "string",
+  },
+  filter: {
+    type: "string",
+    short: "f",
+    default: ".",
+  },
+  "from-file": {
+    type: "string",
+  },
+} as const;
 
-  const request = asStringArg(values.request);
-  if (!isHttpMethod(request)) {
+type ParsedValues = {
+  request: string;
+  header?: string[];
+  data?: string;
+  "enc-url-suffix"?: string;
+  "enc-header"?: string[];
+  "enc-data"?: string;
+  filter: string;
+  "from-file"?: string;
+};
+
+export function parseHttpAction(values: ParsedValues, positionals: string[]) {
+  if (!isHttpMethod(values.request)) {
     throw new Error(`Unsupported HTTP method: ${values.request}`);
   }
 
   if (values["from-file"]) {
     return HttpActionWithProof.fromBytes(
       Buffer.from(
-        fs.readFileSync(asStringArg(values["from-file"]), {
+        fs.readFileSync(values["from-file"], {
           encoding: "utf-8",
         }),
         "base64",
@@ -75,17 +79,17 @@ export function parseHttpAction(args: string[]) {
 
   return new UnencryptedHttpAction(
     HttpRequest.fromParts(
-      request,
+      values.request,
       positionals[0],
-      (values.header || []).map(asStringArg),
-      asOptionalStringArg(values.data) || "",
+      values.header || [],
+      values.data || "",
     ),
     UnencryptedHttpPrivatePatch.fromParts(
-      asOptionalStringArg(values["enc-url-suffix"]) || null,
-      values["enc-header"]?.map(asStringArg) || null,
-      asOptionalStringArg(values["enc-data"]) || null,
+      values["enc-url-suffix"] || null,
+      values["enc-header"] || null,
+      values["enc-data"] || null,
     ),
     positionals[1],
-    asStringArg(values.filter),
+    values.filter,
   );
 }

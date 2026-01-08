@@ -1,7 +1,7 @@
 import { keygen } from "@noble/secp256k1";
 import { base58Decode, base58Encode } from "@waves/ts-lib-crypto";
 import { parseArgs } from "node:util";
-import { parseHttpAction } from "./httpAction.js";
+import { httpActionOptions, parseHttpAction } from "./httpAction.js";
 import { NetworkConfig } from "./lib/config.js";
 import {
   ANY_TD_ADDRESS,
@@ -16,7 +16,7 @@ import {
   recycleRequest,
 } from "./lib/requests.js";
 import { SignerClient } from "./lib/signer.js";
-import { asOptionalStringArg, handleTx, wvs } from "./lib/utils.js";
+import { handleTx, wvs } from "./lib/utils.js";
 import { wallet } from "./lib/wallets.js";
 
 const [command, ...rest] = process.argv.slice(2);
@@ -75,10 +75,7 @@ async function list(rest: string[]) {
   }
   const network = await NetworkConfig.fromArgs(values.config, values.chain);
   const nodeUrl = network.getNodeUrl();
-  for (const req of await fetchRequests(
-    network.dApps.requests,
-    nodeUrl,
-  )) {
+  for (const req of await fetchRequests(network.dApps.requests, nodeUrl)) {
     console.log(`- Key:                ${req.key}
   Responses Address:  ${req.responsesAddress}
   Pool:
@@ -114,7 +111,8 @@ async function list(rest: string[]) {
 }
 
 async function add(rest: string[]) {
-  const { values } = parseArgs({
+  const { values, positionals } = parseArgs({
+    args: rest,
     options: {
       "pool-addr": {
         type: "string",
@@ -140,8 +138,9 @@ async function add(rest: string[]) {
         type: "boolean",
         short: "h",
       },
+      ...httpActionOptions,
     },
-    strict: false,
+    allowPositionals: true,
   });
 
   function printHelp() {
@@ -174,7 +173,7 @@ async function add(rest: string[]) {
 
   const action = (function () {
     try {
-      return parseHttpAction(rest);
+      return parseHttpAction(values, positionals);
     } catch (e) {
       if (e instanceof Error) {
         console.log(e.message);
@@ -188,9 +187,8 @@ async function add(rest: string[]) {
   const chainId = network.chainId;
   const nodeUrl = network.getNodeUrl();
 
-  const poolAddress =
-    asOptionalStringArg(values["pool-addr"]) ?? network.dApps.privatePools;
-  const poolIdArg = asOptionalStringArg(values["pool-id"]);
+  const poolAddress = values["pool-addr"] ?? network.dApps.privatePools;
+  const poolIdArg = values["pool-id"];
   const poolIdHex =
     poolIdArg && poolIdArg.length
       ? poolIdArg
@@ -200,7 +198,7 @@ async function add(rest: string[]) {
   const fullPoolId = new FullPoolId(poolAddress, Buffer.from(poolIdHex, "hex"));
 
   const oracleUrl =
-    asOptionalStringArg(values["oracle-url"]) ??
+    values["oracle-url"] ??
     network
       .forPool(fullPoolId)
       .findOracleUrl(
@@ -358,7 +356,7 @@ async function fulfill(rest: string[]) {
   }
 
   const oracleUrl =
-    asOptionalStringArg(values["oracle-url"]) ??
+    values["oracle-url"] ??
     network.forPool(req.pool).findOracleUrl(req.action.action.patch.tdAddress);
   if (!oracleUrl) {
     console.log("--oracle-url is required and was not found in config");
