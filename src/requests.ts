@@ -1,7 +1,8 @@
 import { keygen } from "@noble/secp256k1";
 import { base58Decode, base58Encode } from "@waves/ts-lib-crypto";
 import { parseArgs } from "node:util";
-import { httpActionOptions, parseHttpAction } from "./httpAction.js";
+import { handleTx } from "./cliUtils.js";
+import { httpActionOptions, parseHttpAction } from "./cliUtils.js";
 import { NetworkConfig } from "./lib/config.js";
 import {
   ANY_TD_ADDRESS,
@@ -16,7 +17,7 @@ import {
   recycleRequest,
 } from "./lib/requests.js";
 import { SignerClient } from "./lib/signer.js";
-import { handleTx, wvs } from "./lib/utils.js";
+import { wvs } from "./lib/utils.js";
 import { wallet } from "./lib/wallets.js";
 
 const [command, ...rest] = process.argv.slice(2);

@@ -1,9 +1,10 @@
 import { base58Decode } from "@waves/ts-lib-crypto";
 import { parseArgs } from "node:util";
+import { handleTx } from "./cliUtils.js";
 import { Config } from "./lib/config.js";
 import { fetchRequests, fulfillRequest } from "./lib/requests.js";
 import { SignerClient } from "./lib/signer.js";
-import { handleTx, wvs } from "./lib/utils.js";
+import { wvs } from "./lib/utils.js";
 import { wallet } from "./lib/wallets.js";
 
 const MIN_REWARD = 0.001 * wvs;

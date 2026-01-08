@@ -1,9 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  HttpRequest,
-  UnencryptedHttpPrivatePatch,
-} from "../src/lib/models.js";
+import { HttpRequest, UnencryptedHttpPrivatePatch } from "../src/lib/models.js";
 
 void test("HttpRequest.fromParts parses URL, headers, and body", () => {
   const req = HttpRequest.fromParts(
@@ -55,21 +52,14 @@ void test("UnencryptedHttpPrivatePatch.fromParts parses suffix parts", () => {
   assert.equal(patch.body?.toString("utf8"), "top");
 });
 
-void test(
-  "UnencryptedHttpPrivatePatch.fromParts handles query-only suffix",
-  () => {
-    const patch = UnencryptedHttpPrivatePatch.fromParts(
-      "?token=abc",
-      null,
-      null,
-    );
+void test("UnencryptedHttpPrivatePatch.fromParts handles query-only suffix", () => {
+  const patch = UnencryptedHttpPrivatePatch.fromParts("?token=abc", null, null);
 
-    assert.equal(patch.pathSuffix, null);
-    assert.deepStrictEqual(
-      patch.parameters.map((p) => [p.key, p.value]),
-      [["token", "abc"]],
-    );
-    assert.deepStrictEqual(patch.headers, []);
-    assert.equal(patch.body, null);
-  },
-);
+  assert.equal(patch.pathSuffix, null);
+  assert.deepStrictEqual(
+    patch.parameters.map((p) => [p.key, p.value]),
+    [["token", "abc"]],
+  );
+  assert.deepStrictEqual(patch.headers, []);
+  assert.equal(patch.body, null);
+});

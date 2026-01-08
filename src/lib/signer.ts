@@ -11,7 +11,7 @@ import {
   QuoteHeader,
   QuoteSignatureData,
 } from "./models.js";
-import { hexToBuffer } from "./utils.js";
+import { removePrefix } from "./utils.js";
 
 type JsonDataItem = {
   timestamp: number;
@@ -295,4 +295,8 @@ function pemToDerList(pemChain: Buffer): Buffer[] {
 
 function b64(str: string) {
   return Buffer.from(str, "base64");
+}
+
+function hexToBuffer(hex: string): Buffer {
+  return Buffer.from(removePrefix(hex, "0x"), "hex");
 }

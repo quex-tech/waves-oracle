@@ -1,6 +1,5 @@
 import { crypto, INonceSeed, seedWithNonce } from "@waves/ts-lib-crypto";
 import { TSeedTypes } from "@waves/waves-transactions";
-import { getEnvVar } from "./utils.js";
 
 export interface IWallet {
   address: (chainId: string) => string;
@@ -39,3 +38,9 @@ class DerivedWallet implements IWallet {
 }
 
 export const wallet = new RootWallet(getEnvVar("SEED"));
+
+function getEnvVar(name: string) {
+  const v = process.env[name];
+  if (v == null || v === "") throw new Error(`Missing env var: ${name}`);
+  return v;
+}

@@ -1,8 +1,8 @@
 import { parseArgs } from "util";
+import { handleTx } from "./cliUtils.js";
 import { addOracle, fetchOracles } from "./lib/attestedPools.js";
 import { NetworkConfig } from "./lib/config.js";
 import { SignerClient } from "./lib/signer.js";
-import { handleTx } from "./lib/utils.js";
 import { wallet } from "./lib/wallets.js";
 
 const [command, ...rest] = process.argv.slice(2);

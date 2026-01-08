@@ -1,9 +1,9 @@
 import { base58Encode } from "@waves/ts-lib-crypto";
 import { parseArgs } from "node:util";
+import { handleTx } from "./cliUtils.js";
 import { NetworkConfig } from "./lib/config.js";
 import { fetchQuotes, registerQuote } from "./lib/quotes.js";
 import { SignerClient } from "./lib/signer.js";
-import { handleTx } from "./lib/utils.js";
 import { wallet } from "./lib/wallets.js";
 
 const [command, ...rest] = process.argv.slice(2);
