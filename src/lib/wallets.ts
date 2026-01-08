@@ -1,6 +1,7 @@
 import { crypto, seedWithNonce } from "@waves/ts-lib-crypto";
 import { TSeedTypes } from "@waves/waves-transactions";
 import { chainId } from "./network.js";
+import { getEnvVar } from "./utils.js";
 
 export type Wallet = {
   address: string;
@@ -20,10 +21,4 @@ function deriveWallet(index: number) {
   const s = seedWithNonce(seed, index);
   const c = crypto({ seed: s, output: "Base58" });
   return { address: c.address(chainId), seed: { privateKey: c.privateKey() } };
-}
-
-function getEnvVar(name: string) {
-  const v = process.env[name];
-  if (v == null || v === "") throw new Error(`Missing env var: ${name}`);
-  return v;
 }

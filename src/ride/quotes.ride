@@ -20,7 +20,30 @@ func skipTLV(buf: ByteVector, off: Int) = {
   (o + l)
 }
 
-let z32 = base58'11111111111111111111111111111111'
+func readTime(buf: ByteVector, off: Int) = {
+  let (l, valO) = readTL(buf, off)
+  let s = toUtf8String(take(drop(buf, valO), l))
+  let yy = parseIntValue(take(s, 2))
+  let year = if yy >= 50 then 1900 + yy else 2000 + yy
+
+  let mon = parseIntValue(take(drop(s, 2), 2))
+  let day = parseIntValue(take(drop(s, 4), 2))
+  let hh  = parseIntValue(take(drop(s, 6), 2))
+  let mi  = parseIntValue(take(drop(s, 8), 2))
+  let ss  = parseIntValue(take(drop(s, 10), 2))
+
+  let y0  = if mon <= 2 then year - 1 else year
+  let era = if y0 >= 0 then y0 / 400 else (y0 - 399) / 400
+  let yoe = y0 - era * 400
+  let mp  = if mon <= 2 then mon + 9 else mon - 3
+  let doy = (153 * mp + 2) / 5 + day - 1
+  let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy
+  let days = era * 146097 + doe - 719468
+
+  ((days * 86400 + hh * 3600 + mi * 60 + ss) * 1000, valO + l)
+}
+
+let z32 = base16'0000000000000000000000000000000000000000000000000000000000000000'
 
 func readCert(buf: ByteVector) = {
   let (certL, tbsO) = readTL(buf, 0)
@@ -29,35 +52,44 @@ func readCert(buf: ByteVector) = {
   let tbsSigO = skipTLV(buf, snO)
   let issO = skipTLV(buf, tbsSigO)
   let valO = skipTLV(buf, issO)
-  let subO = skipTLV(buf, valO)
-  let pkiO = skipTLV(buf, subO)
-  let (pkiL, pkAlgO) = readTL(buf, pkiO)
-  let pkO = skipTLV(buf, pkAlgO)
-  let (pkL, pkValO) = readTL(buf, pkO)
-  let sigO = skipTLV(buf, verO + tbsL)
-  let (sigL, sigValO) = readTL(buf, sigO)
-  let (sigSeqL, rIntO) = readTL(buf, sigValO + 1)
-  let (rIntValL, rIntValO) = readTL(buf, rIntO)
-  let (sIntValL, sIntValO) = readTL(buf, rIntValO + rIntValL)
+  let (valL, nbO) = readTL(buf, valO)
+  let (nb, naO) = readTime(buf, nbO)
+  let (na, subO) = readTime(buf, naO)
+  if nb > lastBlock.timestamp || lastBlock.timestamp > na then throw("time") else {
+    let pkiO = skipTLV(buf, subO)
+    let (pkiL, pkAlgO) = readTL(buf, pkiO)
+    let pkO = skipTLV(buf, pkAlgO)
+    let (pkL, pkValO) = readTL(buf, pkO)
+    let sigO = skipTLV(buf, verO + tbsL)
+    let (sigL, sigValO) = readTL(buf, sigO)
+    let (sigSeqL, rIntO) = readTL(buf, sigValO + 1)
+    let (rIntValL, rIntValO) = readTL(buf, rIntO)
+    let (sIntValL, sIntValO) = readTL(buf, rIntValO + rIntValL)
 
-  let tbs = take(drop(buf, tbsO), (verO - tbsO) + tbsL)
-  let x_ = drop(buf, pkValO + 2)
-  let x = take(x_, 32)
-  let y = take(drop(x_, 32), 32)
-  let r = takeRight(z32 + take(drop(buf, rIntValO), rIntValL), 32)
-  let s = takeRight(z32 + take(drop(buf, sIntValO), sIntValL), 32)
+    let tbs = take(drop(buf, tbsO), (verO - tbsO) + tbsL)
+    let x_ = drop(buf, pkValO + 2)
+    let x = take(x_, 32)
+    let y = take(drop(x_, 32), 32)
+    let r = takeRight(z32 + take(drop(buf, rIntValO), rIntValL), 32)
+    let s = takeRight(z32 + take(drop(buf, sIntValO), sIntValL), 32)
 
-  (tbs, x, y, r, s)
+    (tbs, x, y, r, s)
+  }
 }
+
+let intelX = base16'0BA9C4C0C0C86193A3FE23D6B02CDA10A8BBD4E88E48B4458561A36E705525F5'
+let intelY = base16'67918E2EDC88E40D860BD0CC4EE26AACC988E505A953558C453F6B0904AE7394'
 
 func validateChain(chain: List[ByteVector]) = {
   let (leafTbs, leafX, leafY, leafR, leafS) = readCert(chain[0])
   let (interTbs, interX, interY, interR, interS) = readCert(chain[1])
   let (rootTbs, rootX, rootY, rootR, rootS) = readCert(chain[2])
-  if !p256Verify(interX, interY, leafR, leafS, sha256_16Kb(leafTbs)) then throw("sig leaf") else {
-    if !p256Verify(rootX, rootY, interR, interS, sha256_16Kb(interTbs)) then throw("sig inter") else {
-      if !p256Verify(rootX, rootY, rootR, rootS, sha256_16Kb(rootTbs)) then throw("sig root") else {
-        (leafX, leafY)
+  if rootX != intelX || rootY != intelY then throw("not intel") else {
+    if !p256Verify(interX, interY, leafR, leafS, sha256_16Kb(leafTbs)) then throw("sig leaf") else {
+      if !p256Verify(rootX, rootY, interR, interS, sha256_16Kb(interTbs)) then throw("sig inter") else {
+        if !p256Verify(rootX, rootY, rootR, rootS, sha256_16Kb(rootTbs)) then throw("sig root") else {
+          (leafX, leafY)
+        }
       }
     }
   }
