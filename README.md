@@ -84,6 +84,34 @@ Source code for the oracle is here: https://github.com/quex-tech/quex-v1-signer/
 All commands accept `-h/--help` for details. Omit `--apply` to preview a
 transaction without submitting.
 
+## Generate a wallet
+
+Generate a new seed and print text to add to `.env`:
+
+```sh
+node dist/wallet.js generate
+```
+
+Example output:
+
+```
+SEED="pepper accident eight coffee way mention height dentist double regret rate purchase ivory april whip"
+```
+
+You can also use the default seed for the private node:
+
+```
+SEED="waves private node seed with waves tokens"
+```
+
+You can put it into the `.env` file and run `source load_env.sh`.
+
+Show the root wallet address:
+
+```sh
+node dist/wallet.js show --chain R
+```
+
 ### Deploy Ride scripts
 
 ```sh
