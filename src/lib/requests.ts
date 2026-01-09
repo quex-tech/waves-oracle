@@ -1,6 +1,6 @@
 import { base58Decode, base58Encode, base64Encode } from "@waves/ts-lib-crypto";
 import { DataTransactionEntry } from "@waves/ts-types";
-import { invokeScript, TSeedTypes } from "@waves/waves-transactions";
+import { invokeScript } from "@waves/waves-transactions";
 import { accountData } from "@waves/waves-transactions/dist/nodeInteraction.js";
 import {
   FullPoolId,
@@ -13,6 +13,7 @@ import {
   parseBinaryEntry,
   parseIntegerEntry,
 } from "./utils.js";
+import { IWallet } from "./wallets.js";
 
 export type OracleRequest = {
   key: string;
@@ -63,7 +64,7 @@ export function addRequest(
   reward: number,
   dApp: string,
   chainId: string,
-  seed: TSeedTypes,
+  wallet: IWallet,
 ) {
   const nowUnixSec = Math.floor(nowUnixMs / 1000);
   return invokeScript(
@@ -107,7 +108,7 @@ export function addRequest(
       chainId: chainId,
       payment: [{ amount: reward }],
     },
-    seed,
+    wallet.seed,
   );
 }
 
@@ -115,7 +116,7 @@ export function recycleRequest(
   key: string,
   dApp: string,
   chainId: string,
-  seed: TSeedTypes,
+  wallet: IWallet,
 ) {
   return invokeScript(
     {
@@ -131,7 +132,7 @@ export function recycleRequest(
       },
       chainId: chainId,
     },
-    seed,
+    wallet.seed,
   );
 }
 
@@ -142,7 +143,7 @@ export function fulfillRequest(
   txId: string,
   dApp: string,
   chainId: string,
-  seed: TSeedTypes,
+  wallet: IWallet,
 ) {
   return invokeScript(
     {
@@ -162,7 +163,7 @@ export function fulfillRequest(
       },
       chainId: chainId,
     },
-    seed,
+    wallet.seed,
   );
 }
 

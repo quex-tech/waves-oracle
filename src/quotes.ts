@@ -4,7 +4,7 @@ import { handleTx } from "./cliUtils.js";
 import { NetworkConfig } from "./lib/config.js";
 import { fetchQuotes, registerQuote } from "./lib/quotes.js";
 import { SignerClient } from "./lib/signer.js";
-import { wallet } from "./lib/wallets.js";
+import { RootWallet } from "./lib/wallets.js";
 
 const [command, ...rest] = process.argv.slice(2);
 
@@ -66,7 +66,12 @@ async function register(rest: string[]) {
   const nodeUrl = network.getNodeUrl();
   const quote = await new SignerClient(oracleUrl).quote();
   await handleTx(
-    registerQuote(quote, network.dApps.quotes, network.chainId, wallet.seed),
+    registerQuote(
+      quote,
+      network.dApps.quotes,
+      network.chainId,
+      RootWallet.fromEnv().seed,
+    ),
     Boolean(values.apply),
     nodeUrl,
   );

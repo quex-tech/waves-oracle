@@ -3,7 +3,7 @@ import { handleTx } from "./cliUtils.js";
 import { NetworkConfig } from "./lib/config.js";
 import { addOracle, deleteOracle, fetchOracles } from "./lib/privatePools.js";
 import { SignerClient } from "./lib/signer.js";
-import { wallet } from "./lib/wallets.js";
+import { RootWallet } from "./lib/wallets.js";
 
 const [command, ...rest] = process.argv.slice(2);
 
@@ -76,7 +76,7 @@ async function add(args: string[]) {
       Buffer.from(values["pool-id-suffix"], "hex"),
       await new SignerClient(positionals[0]).publicKey(),
       network.chainId,
-      wallet,
+      RootWallet.fromEnv(),
     ),
     Boolean(values.apply),
     nodeUrl,
@@ -137,7 +137,7 @@ async function del(args: string[]) {
       Buffer.from(values["pool-id-suffix"], "hex"),
       await new SignerClient(positionals[0]).publicKey(),
       network.chainId,
-      wallet,
+      RootWallet.fromEnv(),
     ),
     Boolean(values.apply),
     nodeUrl,

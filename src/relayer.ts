@@ -5,7 +5,7 @@ import { Config } from "./lib/config.js";
 import { fetchRequests, fulfillRequest } from "./lib/requests.js";
 import { SignerClient } from "./lib/signer.js";
 import { wvs } from "./lib/utils.js";
-import { wallet } from "./lib/wallets.js";
+import { RootWallet } from "./lib/wallets.js";
 
 const MIN_REWARD = 0.001 * wvs;
 const FEE = 0.005 * wvs;
@@ -67,6 +67,8 @@ for (const chainId of Object.keys(config.networks)) {
 
     const signerClient = new SignerClient(oracleUrl);
 
+    const wallet = RootWallet.fromEnv();
+
     const res = await signerClient.query(
       req.action,
       base58Decode(wallet.address(chainId)),
@@ -81,7 +83,7 @@ for (const chainId of Object.keys(config.networks)) {
           req.txId,
           network.dApps.requests,
           chainId,
-          wallet.seed,
+          wallet,
         ),
         Boolean(values.apply),
         nodeUrl,

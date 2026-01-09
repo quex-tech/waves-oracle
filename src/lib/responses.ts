@@ -1,9 +1,10 @@
 import { base58Decode, base58Encode } from "@waves/ts-lib-crypto";
 import { DataTransactionEntry } from "@waves/ts-types";
-import { invokeScript, TSeedTypes } from "@waves/waves-transactions";
+import { invokeScript } from "@waves/waves-transactions";
 import { accountData } from "@waves/waves-transactions/dist/nodeInteraction.js";
 import { DataItem, FullPoolId, QuexResponse } from "./models.js";
 import { parseBinaryEntry } from "./utils.js";
+import { IWallet } from "./wallets.js";
 
 export type OracleResponse = {
   actionId: Buffer;
@@ -21,7 +22,7 @@ export function publishResponse(
   pool: FullPoolId,
   dApp: string,
   chainId: string,
-  seed: TSeedTypes,
+  wallet: IWallet,
 ) {
   return invokeScript(
     {
@@ -39,7 +40,7 @@ export function publishResponse(
       },
       chainId: chainId,
     },
-    seed,
+    wallet.seed,
   );
 }
 

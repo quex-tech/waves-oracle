@@ -1,8 +1,7 @@
 import { keygen } from "@noble/secp256k1";
 import { base58Decode, base58Encode } from "@waves/ts-lib-crypto";
 import { parseArgs } from "node:util";
-import { handleTx } from "./cliUtils.js";
-import { httpActionOptions, parseHttpAction } from "./cliUtils.js";
+import { handleTx, httpActionOptions, parseHttpAction } from "./cliUtils.js";
 import { NetworkConfig } from "./lib/config.js";
 import {
   ANY_TD_ADDRESS,
@@ -18,7 +17,7 @@ import {
 } from "./lib/requests.js";
 import { SignerClient } from "./lib/signer.js";
 import { wvs } from "./lib/utils.js";
-import { wallet } from "./lib/wallets.js";
+import { RootWallet } from "./lib/wallets.js";
 
 const [command, ...rest] = process.argv.slice(2);
 
@@ -194,7 +193,9 @@ async function add(rest: string[]) {
     poolIdArg && poolIdArg.length
       ? poolIdArg
       : poolAddress === network.dApps.privatePools
-        ? Buffer.from(base58Decode(wallet.address(chainId))).toString("hex")
+        ? Buffer.from(
+            base58Decode(RootWallet.fromEnv().address(chainId)),
+          ).toString("hex")
         : "";
   const fullPoolId = new FullPoolId(poolAddress, Buffer.from(poolIdHex, "hex"));
 
@@ -232,7 +233,7 @@ async function add(rest: string[]) {
     0.01 * wvs,
     network.dApps.requests,
     chainId,
-    wallet.seed,
+    RootWallet.fromEnv(),
   );
 
   await handleTx(tx, Boolean(values.apply), nodeUrl);
@@ -295,7 +296,7 @@ async function recycle(rest: string[]) {
       positionals[0],
       network.dApps.requests,
       network.chainId,
-      wallet.seed,
+      RootWallet.fromEnv(),
     ),
     Boolean(values.apply),
     nodeUrl,
@@ -366,6 +367,7 @@ async function fulfill(rest: string[]) {
   }
 
   const signerClient = new SignerClient(oracleUrl);
+  const wallet = RootWallet.fromEnv();
   const res = await signerClient.query(
     req.action,
     base58Decode(wallet.address(network.chainId)),
@@ -379,7 +381,7 @@ async function fulfill(rest: string[]) {
       req.txId,
       network.dApps.requests,
       network.chainId,
-      wallet.seed,
+      wallet,
     ),
     Boolean(values.apply),
     nodeUrl,

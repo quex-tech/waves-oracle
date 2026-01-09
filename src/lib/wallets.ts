@@ -9,6 +9,10 @@ export interface IWallet {
 export class RootWallet implements IWallet {
   constructor(private readonly originalSeed: string) {}
 
+  static fromEnv() {
+    return new RootWallet(getEnvVar("SEED"));
+  }
+
   get seed(): TSeedTypes {
     return this.originalSeed;
   }
@@ -36,8 +40,6 @@ class DerivedWallet implements IWallet {
     return c.address(chainId);
   }
 }
-
-export const wallet = new RootWallet(getEnvVar("SEED"));
 
 function getEnvVar(name: string) {
   const v = process.env[name];

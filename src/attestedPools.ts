@@ -3,7 +3,7 @@ import { handleTx } from "./cliUtils.js";
 import { addOracle, fetchOracles } from "./lib/attestedPools.js";
 import { NetworkConfig } from "./lib/config.js";
 import { SignerClient } from "./lib/signer.js";
-import { wallet } from "./lib/wallets.js";
+import { RootWallet } from "./lib/wallets.js";
 
 const [command, ...rest] = process.argv.slice(2);
 
@@ -70,7 +70,7 @@ async function add(args: string[]) {
       quote.getQuoteId(),
       network.dApps.attestedPools,
       network.chainId,
-      wallet,
+      RootWallet.fromEnv(),
     ),
     Boolean(values.apply),
     nodeUrl,

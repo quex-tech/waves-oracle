@@ -2,8 +2,7 @@ import { keygen } from "@noble/secp256k1";
 import { base58Decode } from "@waves/ts-lib-crypto";
 import fs from "fs";
 import { parseArgs } from "node:util";
-import { handleTx } from "./cliUtils.js";
-import { httpActionOptions, parseHttpAction } from "./cliUtils.js";
+import { handleTx, httpActionOptions, parseHttpAction } from "./cliUtils.js";
 import { NetworkConfig } from "./lib/config.js";
 import {
   ANY_TD_ADDRESS,
@@ -12,7 +11,7 @@ import {
 } from "./lib/models.js";
 import { publishResponse } from "./lib/responses.js";
 import { SignerClient } from "./lib/signer.js";
-import { wallet } from "./lib/wallets.js";
+import { RootWallet } from "./lib/wallets.js";
 
 const { values, positionals } = parseArgs({
   options: {
@@ -75,7 +74,9 @@ const poolIdHex =
   poolIdArg && poolIdArg.length
     ? poolIdArg
     : poolAddress === network.dApps.privatePools
-      ? Buffer.from(base58Decode(wallet.address(chainId))).toString("hex")
+      ? Buffer.from(
+          base58Decode(RootWallet.fromEnv().address(chainId)),
+        ).toString("hex")
       : "";
 const fullPoolId = new FullPoolId(poolAddress, Buffer.from(poolIdHex, "hex"));
 
@@ -113,7 +114,7 @@ if (values["output-request"]) {
 
 const res = await signerClient.query(
   actionWithProof,
-  base58Decode(wallet.address(chainId)),
+  base58Decode(RootWallet.fromEnv().address(chainId)),
 );
 console.log(res);
 
@@ -123,7 +124,7 @@ await handleTx(
     fullPoolId,
     network.dApps.responses,
     chainId,
-    wallet.seed,
+    RootWallet.fromEnv(),
   ),
   Boolean(values.apply),
   nodeUrl,
