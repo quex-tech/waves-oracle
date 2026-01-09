@@ -20,3 +20,6 @@ func add(quotesAddr: ByteVector, quoteId: ByteVector) = [
   let pk = takeRight(quote, 64)
   BooleanEntry(toBase58String(quotesAddr) + ":" + toBase58String(id) + ":" + toBase58String(pk), true)
 ]
+
+@Verifier(tx)
+func verify() = false

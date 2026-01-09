@@ -2,7 +2,7 @@ import { base58Decode } from "@waves/ts-lib-crypto";
 import { broadcast, waitForTx } from "@waves/waves-transactions";
 import assert from "node:assert/strict";
 import test from "node:test";
-import { deployDApps } from "../src/lib/deploy.js";
+import { deployDApps, getDApps } from "../src/lib/deploy.js";
 import { RootWallet } from "../src/lib/wallets.js";
 
 const chainId = "R";
@@ -32,17 +32,11 @@ type EvaluateResult = {
 };
 
 void test("quotes.ride helpers", { timeout: 15_000 }, async (t) => {
-  const { dApps, txs } = await deployDApps(
-    wallet,
-    chainId,
-    nodeUrl,
-    srcDirPath,
-  );
-
-  for (const tx of txs) {
+  for await (const tx of deployDApps(wallet, chainId, nodeUrl, srcDirPath)) {
     await broadcast(tx, nodeUrl);
     await waitForTx(tx.id, { apiBase: nodeUrl });
   }
+  const dApps = getDApps(wallet, chainId);
 
   await t.test("readTime", async () => {
     const val = await evaluate(

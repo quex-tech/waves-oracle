@@ -48,3 +48,6 @@ func publish(res: ByteVector, poolAddr: ByteVector, poolId: ByteVector) = {
         }
     }
 }
+
+@Verifier(tx)
+func verify() = false

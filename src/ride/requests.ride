@@ -75,3 +75,6 @@ func fulfill(res: ByteVector, resAddr: ByteVector, poolAddr: ByteVector, poolId:
     ]
   }
 }
+
+@Verifier(tx)
+func verify() = false

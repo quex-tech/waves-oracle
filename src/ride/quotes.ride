@@ -125,3 +125,6 @@ func register(
     }
   }
 }
+
+@Verifier(tx)
+func verify() = false

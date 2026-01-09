@@ -22,3 +22,6 @@ func add(poolIdSuffix: ByteVector, pk: ByteVector) = [
 func delete(poolIdSuffix: ByteVector, pk: ByteVector) = [
   DeleteEntry(toBase58String(i.originCaller.bytes) + ":" + toBase58String(poolIdSuffix) + ":" + toBase58String(pk))
 ]
+
+@Verifier(tx)
+func verify() = false

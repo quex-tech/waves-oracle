@@ -10,7 +10,7 @@ import {
   helpOptions,
 } from "./cliUtils.js";
 import { NetworkConfig } from "./lib/config.js";
-import { deployDApps } from "./lib/deploy.js";
+import { deployDApps, getDApps } from "./lib/deploy.js";
 import { RootWallet } from "./lib/wallets.js";
 
 const options = {
@@ -48,13 +48,9 @@ const nodeUrl = network.getNodeUrl();
 const srcDirPath = values["src-path"];
 
 const apply = Boolean(values.apply);
-const { dApps, txs } = await deployDApps(
-  RootWallet.fromEnv(),
-  chainId,
-  nodeUrl,
-  srcDirPath,
-);
-for (const tx of txs) {
+const wallet = RootWallet.fromEnv();
+
+for await (const tx of deployDApps(wallet, chainId, nodeUrl, srcDirPath)) {
   await handleTx(tx, apply, nodeUrl);
 }
 
@@ -62,7 +58,7 @@ console.log(
   JSON.stringify(
     {
       [chainId]: {
-        dApps: dApps,
+        dApps: getDApps(wallet, chainId),
       },
     },
     undefined,
