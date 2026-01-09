@@ -67,6 +67,14 @@ export function doOrExit<R>(fn: () => R, beforeExit: () => void) {
   }
 }
 
+export function parseNumberOption(value: string, name: string) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`Invalid --${name} value: ${value}`);
+  }
+  return parsed;
+}
+
 export function formatOptions(specs: CliOptionsSpec) {
   const entries = Object.entries(specs).map(([name, spec]) => {
     const label =
@@ -77,7 +85,7 @@ export function formatOptions(specs: CliOptionsSpec) {
       : `      ${longName}`;
     const desc =
       spec.default !== undefined
-        ? `${spec.description} (default: ${JSON.stringify(spec.default)})`
+        ? `${spec.description} (default: ${formatDefault(spec.default)})`
         : spec.description;
     return { left, desc };
   });
@@ -87,6 +95,13 @@ export function formatOptions(specs: CliOptionsSpec) {
   );
   return `Options:
 ${entries.map((entry) => `${entry.left.padEnd(maxLeft + 2)}${entry.desc}`).join("\n")}`;
+}
+
+function formatDefault(def: string | boolean | string[] | boolean[]): string {
+  if (Array.isArray(def)) {
+    return def.map(formatDefault).join(", ");
+  }
+  return String(def).includes(" ") ? `"${def}"` : String(def);
 }
 
 export const configOptions = {

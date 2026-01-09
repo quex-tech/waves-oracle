@@ -60,13 +60,13 @@ export function addRequest(
   action: HttpActionWithProof,
   responsesAddress: string,
   pool: FullPoolId,
-  nowUnixMs: number,
+  afterUnixSec: number,
+  beforeUnixSec: number,
   reward: number,
   dApp: string,
   chainId: string,
   wallet: IWallet,
 ) {
-  const nowUnixSec = Math.floor(nowUnixMs / 1000);
   return invokeScript(
     {
       dApp: dApp,
@@ -97,11 +97,11 @@ export function addRequest(
           },
           {
             type: "integer",
-            value: nowUnixSec,
+            value: afterUnixSec,
           },
           {
             type: "integer",
-            value: nowUnixSec + 5 * 60,
+            value: beforeUnixSec,
           },
         ],
       },

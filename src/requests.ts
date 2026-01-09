@@ -14,6 +14,7 @@ import {
   httpActionOptions,
   oracleUrlOptions,
   parseHttpAction,
+  parseNumberOption,
   poolOptions,
 } from "./cliUtils.js";
 import { NetworkConfig } from "./lib/config.js";
@@ -146,6 +147,28 @@ async function add(rest: string[]) {
     ...httpActionOptions,
     ...oracleUrlOptions,
     ...poolOptions,
+    ...({
+      delay: {
+        type: "string",
+        default: "0",
+        valueLabel: "minutes",
+        description: "Delay in minutes before request range starts.",
+      },
+      ttl: {
+        type: "string",
+        default: "60",
+        valueLabel: "minutes",
+        description:
+          "TTL of the request in minutes. After it expires, author can reclaim funds.",
+      },
+      reward: {
+        type: "string",
+        default: "0.01",
+        valueLabel: "waves",
+        description:
+          "Reward in WAVES (suggested >= 0.005 to cover invoke fee).",
+      },
+    } as const),
     ...applyOptions,
     ...helpOptions,
   } as const;
@@ -218,6 +241,45 @@ ${formatOptions(options)}`);
   const tdPublicKey = await signerClient.publicKey();
   const senderPrivKey = keygen().secretKey;
 
+  const delayMinutes = doOrExit(
+    () => parseNumberOption(values.delay, "delay"),
+    printHelp,
+  );
+  if (delayMinutes < 0) {
+    console.log("--delay must be >= 0");
+    printHelp();
+    process.exit(1);
+  }
+
+  const ttlMinutes = doOrExit(
+    () => parseNumberOption(values.ttl, "ttl"),
+    printHelp,
+  );
+  if (ttlMinutes <= 0) {
+    console.log("--ttl must be > 0");
+    printHelp();
+    process.exit(1);
+  }
+
+  const rewardWaves = doOrExit(
+    () => parseNumberOption(values.reward, "reward"),
+    printHelp,
+  );
+  if (rewardWaves < 0) {
+    console.log("--reward must be >= 0");
+    printHelp();
+    process.exit(1);
+  }
+
+  const afterUnixSec = Math.floor(Date.now() / 1000 + delayMinutes * 60);
+  const beforeUnixSec = afterUnixSec + Math.floor(ttlMinutes * 60);
+  if (beforeUnixSec <= afterUnixSec) {
+    console.log("--ttl results in an invalid time range");
+    printHelp();
+    process.exit(1);
+  }
+  const rewardAmount = Math.round(rewardWaves * wvs);
+
   const actionWithProof =
     action instanceof HttpActionWithProof
       ? action
@@ -234,8 +296,9 @@ ${formatOptions(options)}`);
     actionWithProof,
     network.dApps.responses,
     fullPoolId,
-    Date.now(),
-    0.01 * wvs,
+    afterUnixSec,
+    beforeUnixSec,
+    rewardAmount,
     network.dApps.requests,
     chainId,
     RootWallet.fromEnv(),

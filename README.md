@@ -95,6 +95,7 @@ node dist/deploy.js --config ./config.json --chain R --src-path ./src/ride --app
 This command derives some wallets from the root SEED, funds them from the root wallet, and sets up scripts there.
 
 Example output:
+
 ```
 {
   "R": {
@@ -191,6 +192,8 @@ node --experimental-global-webcrypto dist/requests.js add \
   --oracle-url http://localhost:8080 \
   --pool-addr <pool-address> \
   --pool-id <pool-id> \
+  --ttl 60 \
+  --reward 0.01 \
   "https://api.binance.com/api/v3/depth?symbol=BTCUSDT&limit=1" \
   "(uint,(uint,uint)[])" \
   --apply
@@ -221,5 +224,5 @@ node dist/requests.js fulfill <key> --apply
 Automatically fulfill eligible requests:
 
 ```sh
-node dist/relayer.js --apply
+node dist/relayer.js --chain R --min-reward 0.01 --apply
 ```
