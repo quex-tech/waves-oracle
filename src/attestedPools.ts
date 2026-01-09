@@ -1,11 +1,32 @@
 import { parseArgs } from "util";
-import { handleTx } from "./cliUtils.js";
+import {
+  applyOptions,
+  chainOptions,
+  configOptions,
+  doOrExit,
+  formatOptions,
+  getCommand,
+  handleTx,
+  helpOptions,
+} from "./cliUtils.js";
 import { addOracle, fetchOracles } from "./lib/attestedPools.js";
 import { NetworkConfig } from "./lib/config.js";
 import { SignerClient } from "./lib/signer.js";
 import { RootWallet } from "./lib/wallets.js";
 
 const [command, ...rest] = process.argv.slice(2);
+
+function printRootHelp() {
+  console.log(`Usage:
+ ${getCommand()} <command>
+
+Manages attested oracles stored on-chain
+
+Positional arguments:
+  command
+    add                 Add an oracle to the attested pool
+    list                List attested oracles`);
+}
 
 switch (command) {
   case "add":
@@ -14,41 +35,46 @@ switch (command) {
   case "list":
     await list(rest);
     break;
+  case "-h":
+  case "--help":
+  case undefined:
+    printRootHelp();
+    break;
   default:
-    console.log(`Usage: ${process.argv[0]} ${process.argv[1]} add|list`);
+    printRootHelp();
     break;
 }
 
 async function add(args: string[]) {
-  const { values, positionals } = parseArgs({
-    args: args,
-    options: {
-      apply: {
-        type: "boolean",
-      },
-      config: {
-        type: "string",
-        default: "./config.json",
-      },
-      chain: {
-        type: "string",
-        default: "R",
-      },
-      help: {
-        type: "boolean",
-        short: "h",
-      },
-    },
-    allowPositionals: true,
-  });
+  const options = {
+    ...configOptions,
+    ...chainOptions,
+    ...applyOptions,
+    ...helpOptions,
+  } as const;
+
+  const { values, positionals } = doOrExit(
+    () =>
+      parseArgs({
+        args: args,
+        options: options,
+        allowPositionals: true,
+      }),
+    printHelp,
+  );
+
   function printHelp() {
-    console.log(
-      `Usage: ${process.argv[0]} ${process.argv[1]} add [options] <oracle-url>
-     --chain <id>            Chain ID. Default: R
-     --apply                 Actually submit the transactions
- -h, --help                  Show this help message and exit`,
-    );
+    console.log(`Usage:
+ ${getCommand()} add [options] <oracle-url>
+
+Adds an oracle to the attested pool
+
+Positional arguments:
+  oracle-url            Base URL of the oracle API
+
+${formatOptions(options)}`);
   }
+
   if (values.help) {
     printHelp();
     process.exit(0);
@@ -78,31 +104,30 @@ async function add(args: string[]) {
 }
 
 async function list(args: string[]) {
-  const { values } = parseArgs({
-    args: args,
-    options: {
-      config: {
-        type: "string",
-        default: "./config.json",
-      },
-      chain: {
-        type: "string",
-        default: "R",
-      },
-      help: {
-        type: "boolean",
-        short: "h",
-      },
-    },
-  });
+  const options = {
+    ...configOptions,
+    ...chainOptions,
+    ...helpOptions,
+  } as const;
+
+  const { values } = doOrExit(
+    () =>
+      parseArgs({
+        args: args,
+        options: options,
+      }),
+    printHelp,
+  );
+
   function printHelp() {
-    console.log(
-      `Usage: ${process.argv[0]} ${process.argv[1]} list [options]
-     --config <path>        Path to config.json. Default: ./config.json
-     --chain <id>           Chain ID. Default: R
- -h, --help                 Show this help message and exit`,
-    );
+    console.log(`Usage:
+ ${getCommand()} list [options]
+
+Lists attested oracles stored on-chain
+
+${formatOptions(options)}`);
   }
+
   if (values.help) {
     printHelp();
     process.exit(0);

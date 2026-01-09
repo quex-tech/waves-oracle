@@ -1,7 +1,21 @@
 import { keygen } from "@noble/secp256k1";
 import { base58Decode, base58Encode } from "@waves/ts-lib-crypto";
+import fs from "fs";
 import { parseArgs } from "node:util";
-import { handleTx, httpActionOptions, parseHttpAction } from "./cliUtils.js";
+import {
+  applyOptions,
+  chainOptions,
+  configOptions,
+  doOrExit,
+  formatOptions,
+  getCommand,
+  handleTx,
+  helpOptions,
+  httpActionOptions,
+  oracleUrlOptions,
+  parseHttpAction,
+  poolOptions,
+} from "./cliUtils.js";
 import { NetworkConfig } from "./lib/config.js";
 import {
   ANY_TD_ADDRESS,
@@ -21,6 +35,20 @@ import { RootWallet } from "./lib/wallets.js";
 
 const [command, ...rest] = process.argv.slice(2);
 
+function printRootHelp() {
+  console.log(`Usage:
+ ${getCommand()} <command>
+
+Manages pending oracle requests stored on-chain
+
+Positional arguments:
+  command
+    list                List pending oracle requests
+    add                 Add a request
+    recycle             Recycle an expired request
+    fulfill             Fulfill a request`);
+}
+
 switch (command) {
   case "list":
     await list(rest);
@@ -34,45 +62,46 @@ switch (command) {
   case "fulfill":
     await fulfill(rest);
     break;
+  case "-h":
+  case "--help":
+  case undefined:
+    printRootHelp();
+    break;
   default:
-    console.log(
-      `Usage: ${process.argv[0]} ${process.argv[1]} list|add|recycle|fulfill`,
-    );
+    printRootHelp();
     break;
 }
 
 async function list(rest: string[]) {
-  const { values } = parseArgs({
-    args: rest,
-    options: {
-      config: {
-        type: "string",
-        default: "./config.json",
-      },
-      chain: {
-        type: "string",
-        default: "R",
-      },
-      help: {
-        type: "boolean",
-        short: "h",
-      },
-    },
-  });
+  const options = {
+    ...configOptions,
+    ...chainOptions,
+    ...helpOptions,
+  } as const;
+
+  const { values } = doOrExit(
+    () =>
+      parseArgs({
+        args: rest,
+        options: options,
+      }),
+    printHelp,
+  );
 
   function printHelp() {
-    console.log(
-      `Usage: ${process.argv[0]} ${process.argv[1]} list [options]
-     --config <path>     Path to config.json. Default: ./config.json
-     --chain <id>        Chain ID. Default: R
- -h, --help              Show this help message and exit`,
-    );
+    console.log(`Usage:
+ ${getCommand()} list [options]
+
+Lists pending oracle requests stored on-chain
+
+${formatOptions(options)}`);
   }
 
   if (values.help) {
     printHelp();
     process.exit(0);
   }
+
   const network = await NetworkConfig.fromArgs(values.config, values.chain);
   const nodeUrl = network.getNodeUrl();
   for (const req of await fetchRequests(network.dApps.requests, nodeUrl)) {
@@ -111,59 +140,37 @@ async function list(rest: string[]) {
 }
 
 async function add(rest: string[]) {
-  const { values, positionals } = parseArgs({
-    args: rest,
-    options: {
-      "pool-addr": {
-        type: "string",
-      },
-      "pool-id": {
-        type: "string",
-      },
-      "oracle-url": {
-        type: "string",
-      },
-      config: {
-        type: "string",
-        default: "./config.json",
-      },
-      chain: {
-        type: "string",
-        default: "R",
-      },
-      apply: {
-        type: "boolean",
-      },
-      help: {
-        type: "boolean",
-        short: "h",
-      },
-      ...httpActionOptions,
-    },
-    allowPositionals: true,
-  });
+  const options = {
+    ...configOptions,
+    ...chainOptions,
+    ...httpActionOptions,
+    ...oracleUrlOptions,
+    ...poolOptions,
+    ...applyOptions,
+    ...helpOptions,
+  } as const;
+
+  const { values, positionals } = doOrExit(
+    () =>
+      parseArgs({
+        args: rest,
+        options: options,
+        allowPositionals: true,
+      }),
+    printHelp,
+  );
 
   function printHelp() {
     console.log(`Usage:
- ${process.argv[0]} ${process.argv[1]} add [options] <url> <schema>
- ${process.argv[0]} ${process.argv[1]} add --from-file <path> [options]
- <schema>                       Schema to encode response body. Examples: "int", "(string,(int,bool[]))"
- -X, --request <method>         Specify request method to use. Default: GET
- -H, --header <header>          Pass custom header(s) to server. Example: "Content-Type: application/json"
- -d, --data <data>              HTTP POST data
-     --enc-url-suffix <suffix>  URL suffix to append and send encrypted. Examples: /sec, ?sec=1&enc=2, /sec?enc=a
-     --enc-header <header>      Pass custom header(s) to server encrypted
-     --enc-data <data>          HTTP POST data to send encrypted
- -f, --filter                   jq filter to transform response body. Default: .
-     --output-request <path>    Save base64-encoded request into a file
-     --from-file <path>         Use request from file
-     --oracle-url <url>         Base URL of the oracle API. Default: from config
-     --pool-addr <address>      Address of the oracle pool script with isInPool method. Default: from config
-     --pool-id <address>        Pool ID in hex. Default: wallet address when using private pool
-     --config <path>            Path to config.json. Default: ./config.json
-     --chain <id>               Chain ID. Default: R
-     --apply                    Actually submit the transaction
- -h, --help                     Show this help message and exit`);
+ ${getCommand()} add [options] <url> <schema>
+ ${getCommand()} add --from-file <path> [options]
+
+Adds an oracle request on-chain
+
+Positional arguments:
+  schema                         Schema to encode response body. Examples: "int", "(string,(int,bool[]))"
+
+${formatOptions(options)}`);
   }
 
   if (values.help) {
@@ -171,17 +178,10 @@ async function add(rest: string[]) {
     process.exit(0);
   }
 
-  const action = (function () {
-    try {
-      return parseHttpAction(values, positionals);
-    } catch (e) {
-      if (e instanceof Error) {
-        console.log(e.message);
-      }
-      printHelp();
-      process.exit(1);
-    }
-  })();
+  const action = doOrExit(
+    () => parseHttpAction(values, positionals),
+    printHelp,
+  );
 
   const network = await NetworkConfig.fromArgs(values.config, values.chain);
   const chainId = network.chainId;
@@ -225,6 +225,11 @@ async function add(rest: string[]) {
           .encrypt(tdPublicKey, await signerClient.address(), senderPrivKey)
           .addProof(tdPublicKey, senderPrivKey);
 
+  if (values["output-request"]) {
+    const encodedAction = actionWithProof.toBytes().toString("base64");
+    fs.writeFileSync(values["output-request"], encodedAction);
+  }
+
   const tx = addRequest(
     actionWithProof,
     network.dApps.responses,
@@ -246,36 +251,33 @@ async function add(rest: string[]) {
 }
 
 async function recycle(rest: string[]) {
-  const { values, positionals } = parseArgs({
-    args: rest,
-    options: {
-      apply: {
-        type: "boolean",
-      },
-      config: {
-        type: "string",
-        default: "./config.json",
-      },
-      chain: {
-        type: "string",
-        default: "R",
-      },
-      help: {
-        type: "boolean",
-        short: "h",
-      },
-    },
-    allowPositionals: true,
-  });
+  const options = {
+    ...configOptions,
+    ...chainOptions,
+    ...applyOptions,
+    ...helpOptions,
+  } as const;
+
+  const { values, positionals } = doOrExit(
+    () =>
+      parseArgs({
+        args: rest,
+        options: options,
+        allowPositionals: true,
+      }),
+    printHelp,
+  );
 
   function printHelp() {
-    console.log(
-      `Usage: ${process.argv[0]} ${process.argv[1]} recycle [options] <key>
-     --config <path>     Path to config.json. Default: ./config.json
-     --chain <id>        Chain ID. Default: R
-     --apply             Actually submit the transaction
- -h, --help              Show this help message and exit`,
-    );
+    console.log(`Usage:
+ ${getCommand()} recycle [options] <key>
+
+Recycles an expired oracle request
+
+Positional arguments:
+  key                   Request key to recycle
+
+${formatOptions(options)}`);
   }
 
   if (values.help) {
@@ -304,50 +306,46 @@ async function recycle(rest: string[]) {
 }
 
 async function fulfill(rest: string[]) {
-  const { values, positionals } = parseArgs({
-    args: rest,
-    options: {
-      "oracle-url": {
-        type: "string",
-      },
-      config: {
-        type: "string",
-        default: "./config.json",
-      },
-      chain: {
-        type: "string",
-        default: "R",
-      },
-      apply: {
-        type: "boolean",
-      },
-      help: {
-        type: "boolean",
-        short: "h",
-      },
-    },
-    allowPositionals: true,
-  });
+  const options = {
+    ...configOptions,
+    ...chainOptions,
+    ...oracleUrlOptions,
+    ...applyOptions,
+    ...helpOptions,
+  } as const;
+
+  const { values, positionals } = doOrExit(
+    () =>
+      parseArgs({
+        args: rest,
+        options: options,
+        allowPositionals: true,
+      }),
+    printHelp,
+  );
 
   function printHelp() {
-    console.log(
-      `Usage: ${process.argv[0]} ${process.argv[1]} fulfill [options] <key>
-     --oracle-url <url>  Base URL of the oracle API. Default: from config
-     --config <path>     Path to config.json. Default: ./config.json
-     --chain <id>        Chain ID. Default: R
-     --apply             Actually submit the transaction
- -h, --help              Show this help message and exit`,
-    );
+    console.log(`Usage:
+ ${getCommand()} fulfill [options] <key>
+
+Fulfills a pending oracle request
+
+Positional arguments:
+  key                     Request key to fulfill
+
+${formatOptions(options)}`);
   }
 
   if (values.help) {
     printHelp();
     process.exit(0);
   }
+
   if (!positionals[0]) {
     printHelp();
     process.exit(1);
   }
+
   const network = await NetworkConfig.fromArgs(values.config, values.chain);
   const nodeUrl = network.getNodeUrl();
 

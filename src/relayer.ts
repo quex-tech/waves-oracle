@@ -1,6 +1,14 @@
 import { base58Decode } from "@waves/ts-lib-crypto";
 import { parseArgs } from "node:util";
-import { handleTx } from "./cliUtils.js";
+import {
+  applyOptions,
+  configOptions,
+  doOrExit,
+  formatOptions,
+  getCommand,
+  handleTx,
+  helpOptions,
+} from "./cliUtils.js";
 import { Config } from "./lib/config.js";
 import { fetchRequests, fulfillRequest } from "./lib/requests.js";
 import { SignerClient } from "./lib/signer.js";
@@ -10,29 +18,21 @@ import { RootWallet } from "./lib/wallets.js";
 const MIN_REWARD = 0.001 * wvs;
 const FEE = 0.005 * wvs;
 
-const { values } = parseArgs({
-  options: {
-    config: {
-      type: "string",
-      default: "./config.json",
-    },
-    apply: {
-      type: "boolean",
-    },
-    help: {
-      type: "boolean",
-      short: "h",
-    },
-  },
-});
+const options = {
+  ...configOptions,
+  ...applyOptions,
+  ...helpOptions,
+} as const;
+
+const { values } = doOrExit(() => parseArgs({ options: options }), printHelp);
 
 function printHelp() {
-  console.log(
-    `Usage: ${process.argv[0]} ${process.argv[1]} [options]
-     --config <path>     Path to config.json with oracles. Default: ./config.json
-     --apply             Actually submit the transactions
- -h, --help              Show this help message and exit`,
-  );
+  console.log(`Usage:
+ ${getCommand()} [options]
+
+Fulfills pending oracle requests
+
+${formatOptions(options)}`);
 }
 
 if (values.help) {

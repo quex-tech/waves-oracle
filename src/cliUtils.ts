@@ -1,6 +1,7 @@
 import type { SignedTransaction, Transaction, WithId } from "@waves/ts-types";
 import { broadcast, waitForTx } from "@waves/waves-transactions";
 import fs from "fs";
+import path from "node:path";
 import {
   HttpActionWithProof,
   HttpRequest,
@@ -27,38 +28,176 @@ export async function handleTx(
   console.log("Transaction confirmed.");
 }
 
+export function getCommand() {
+  const scriptArg = process.argv[1] ?? "";
+  if (!scriptArg) {
+    return "node script.js";
+  }
+  const scriptPath = path.relative(process.cwd(), scriptArg);
+  if (
+    scriptPath &&
+    !scriptPath.startsWith("..") &&
+    !path.isAbsolute(scriptPath)
+  ) {
+    return `node ${scriptPath}`;
+  }
+  return `node ${scriptArg}`;
+}
+
+type CliOptionSpec = {
+  type: "string" | "boolean";
+  description: string;
+  default?: string | boolean | string[] | boolean[];
+  short?: string;
+  multiple?: boolean;
+  valueLabel?: string;
+};
+
+type CliOptionsSpec = Record<string, CliOptionSpec>;
+
+export function doOrExit<R>(fn: () => R, beforeExit: () => void) {
+  try {
+    return fn();
+  } catch (err) {
+    if (err instanceof Error) {
+      console.log(err.message);
+    }
+    beforeExit();
+    process.exit(1);
+  }
+}
+
+export function formatOptions(specs: CliOptionsSpec) {
+  const entries = Object.entries(specs).map(([name, spec]) => {
+    const label =
+      spec.type === "boolean" ? "" : ` <${spec.valueLabel ?? name}>`;
+    const longName = `--${name}${label}`;
+    const left = spec.short
+      ? `  -${spec.short}, ${longName}`
+      : `      ${longName}`;
+    const desc =
+      spec.default !== undefined
+        ? `${spec.description} (default: ${JSON.stringify(spec.default)})`
+        : spec.description;
+    return { left, desc };
+  });
+  const maxLeft = entries.reduce(
+    (max, entry) => Math.max(max, entry.left.length),
+    0,
+  );
+  return `Options:
+${entries.map((entry) => `${entry.left.padEnd(maxLeft + 2)}${entry.desc}`).join("\n")}`;
+}
+
+export const configOptions = {
+  config: {
+    type: "string",
+    default: "./config.json",
+    valueLabel: "path",
+    description: "Path to config.json",
+  },
+} as const;
+
+export const chainOptions = {
+  chain: {
+    type: "string",
+    default: "R",
+    valueLabel: "id",
+    description: "Chain ID",
+  },
+} as const;
+
+export const applyOptions = {
+  apply: {
+    type: "boolean",
+    description: "Actually submit the transactions",
+  },
+} as const;
+
+export const helpOptions = {
+  help: {
+    type: "boolean",
+    short: "h",
+    description: "Show this help message and exit",
+  },
+} as const;
+
+export const poolOptions = {
+  "pool-addr": {
+    type: "string",
+    valueLabel: "address",
+    description: "Address of the oracle pool script with isInPool method.",
+  },
+  "pool-id": {
+    type: "string",
+    valueLabel: "address",
+    description: "Pool ID in hex.",
+  },
+} as const;
+
+export const oracleUrlOptions = {
+  "oracle-url": {
+    type: "string",
+    valueLabel: "url",
+    description: "Base URL of the oracle API.",
+  },
+} as const;
+
 export const httpActionOptions = {
   request: {
     type: "string",
     default: "GET",
     short: "X",
+    valueLabel: "method",
+    description: "Specify request method to use.",
   },
   header: {
     type: "string",
     multiple: true,
     short: "H",
+    valueLabel: "header",
+    description:
+      'Pass custom header(s) to server. Example: "Content-Type: application/json"',
   },
   data: {
     type: "string",
     short: "d",
+    valueLabel: "data",
+    description: "HTTP POST data",
   },
   "enc-url-suffix": {
     type: "string",
+    valueLabel: "suffix",
+    description:
+      "URL suffix to append and send encrypted. Examples: /sec, ?sec=1&enc=2, /sec?enc=a",
   },
   "enc-header": {
     type: "string",
     multiple: true,
+    valueLabel: "header",
+    description: "Pass custom header(s) to server encrypted",
   },
   "enc-data": {
     type: "string",
+    valueLabel: "data",
+    description: "HTTP POST data to send encrypted",
   },
   filter: {
     type: "string",
     short: "f",
     default: ".",
+    valueLabel: "filter",
+    description: "jq filter to transform response body.",
   },
   "from-file": {
     type: "string",
+    valueLabel: "path",
+    description: "Use request from file",
+  },
+  "output-request": {
+    type: "string",
+    valueLabel: "path",
+    description: "Save base64-encoded request into a file",
   },
 } as const;
 

@@ -1,23 +1,36 @@
 import { parseArgs } from "node:util";
+import {
+  chainOptions,
+  configOptions,
+  doOrExit,
+  formatOptions,
+  getCommand,
+  helpOptions,
+} from "./cliUtils.js";
 import { NetworkConfig } from "./lib/config.js";
 import { fetchResponses } from "./lib/responses.js";
 
-const { values } = parseArgs({
-  options: {
-    config: {
-      type: "string",
-      default: "./config.json",
-    },
-    chain: {
-      type: "string",
-      default: "R",
-    },
-    help: {
-      type: "boolean",
-      short: "h",
-    },
-  },
-});
+const options = {
+  ...configOptions,
+  ...chainOptions,
+  ...helpOptions,
+} as const;
+
+const { values } = doOrExit(() => parseArgs({ options: options }), printHelp);
+
+function printHelp() {
+  console.log(`Usage:
+ ${getCommand()} [options]
+
+Lists oracle responses stored on-chain
+
+${formatOptions(options)}`);
+}
+
+if (values.help) {
+  printHelp();
+  process.exit(0);
+}
 
 const network = await NetworkConfig.fromArgs(values.config, values.chain);
 

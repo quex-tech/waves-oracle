@@ -1,12 +1,33 @@
 import { base58Encode } from "@waves/ts-lib-crypto";
 import { parseArgs } from "node:util";
-import { handleTx } from "./cliUtils.js";
+import {
+  applyOptions,
+  chainOptions,
+  configOptions,
+  doOrExit,
+  formatOptions,
+  getCommand,
+  handleTx,
+  helpOptions,
+} from "./cliUtils.js";
 import { NetworkConfig } from "./lib/config.js";
 import { fetchQuotes, registerQuote } from "./lib/quotes.js";
 import { SignerClient } from "./lib/signer.js";
 import { RootWallet } from "./lib/wallets.js";
 
 const [command, ...rest] = process.argv.slice(2);
+
+function printRootHelp() {
+  console.log(`Usage:
+ ${getCommand()} <command>
+
+Manages TD quotes stored on-chain
+
+Positional arguments:
+  command
+    register                     Register a new quote
+    list                         List registered quotes`);
+}
 
 switch (command) {
   case "register":
@@ -15,46 +36,51 @@ switch (command) {
   case "list":
     await list(rest);
     break;
+  case "-h":
+  case "--help":
+  case undefined:
+    printRootHelp();
+    break;
   default:
-    console.log(`Usage: ${process.argv[0]} ${process.argv[1]} register|list`);
+    printRootHelp();
     break;
 }
 
 async function register(rest: string[]) {
-  const { values, positionals } = parseArgs({
-    args: rest,
-    options: {
-      config: {
-        type: "string",
-        default: "./config.json",
-      },
-      chain: {
-        type: "string",
-        default: "R",
-      },
-      apply: {
-        type: "boolean",
-      },
-      help: {
-        type: "boolean",
-        short: "h",
-      },
-    },
-    allowPositionals: true,
-  });
+  const options = {
+    ...configOptions,
+    ...chainOptions,
+    ...applyOptions,
+    ...helpOptions,
+  } as const;
+
+  const { values, positionals } = doOrExit(
+    () =>
+      parseArgs({
+        args: rest,
+        options: options,
+        allowPositionals: true,
+      }),
+    printHelp,
+  );
+
   function printHelp() {
-    console.log(
-      `Usage: ${process.argv[0]} ${process.argv[1]} register [options] <oracle-url>
-     --config <path>     Path to config.json. Default: ./config.json
-     --chain <id>        Chain ID. Default: R
-     --apply             Actually submit the transactions
- -h, --help              Show this help message and exit`,
-    );
+    console.log(`Usage:
+ ${getCommand()} register [options] <oracle-url>
+
+Registers a TD quote on-chain
+
+Positional arguments:
+  oracle-url                    Base URL of the oracle API
+
+${formatOptions(options)}`);
   }
+
   if (values.help) {
     printHelp();
     process.exit(0);
   }
+
   const oracleUrl = positionals[0];
   if (!oracleUrl) {
     console.log("<oracle-url> is required");
@@ -78,35 +104,35 @@ async function register(rest: string[]) {
 }
 
 async function list(rest: string[]) {
-  const { values } = parseArgs({
-    args: rest,
-    options: {
-      config: {
-        type: "string",
-        default: "./config.json",
-      },
-      chain: {
-        type: "string",
-        default: "R",
-      },
-      help: {
-        type: "boolean",
-        short: "h",
-      },
-    },
-  });
+  const options = {
+    ...configOptions,
+    ...chainOptions,
+    ...helpOptions,
+  } as const;
+
+  const { values } = doOrExit(
+    () =>
+      parseArgs({
+        args: rest,
+        options: options,
+      }),
+    printHelp,
+  );
+
   function printHelp() {
-    console.log(
-      `Usage: ${process.argv[0]} ${process.argv[1]} list [options]
-     --config <path>     Path to config.json. Default: ./config.json
-     --chain <id>        Chain ID. Default: R
- -h, --help              Show this help message and exit`,
-    );
+    console.log(`Usage:
+ ${getCommand()} list [options]
+
+Lists registered TD quotes
+
+${formatOptions(options)}`);
   }
+
   if (values.help) {
     printHelp();
     process.exit(0);
   }
+
   const network = await NetworkConfig.fromArgs(values.config, values.chain);
   const nodeUrl = network.getNodeUrl();
   const quotes = await fetchQuotes(network.dApps.quotes, nodeUrl);

@@ -1,42 +1,44 @@
 import { parseArgs } from "node:util";
-import { handleTx } from "./cliUtils.js";
+import {
+  applyOptions,
+  chainOptions,
+  configOptions,
+  doOrExit,
+  formatOptions,
+  getCommand,
+  handleTx,
+  helpOptions,
+} from "./cliUtils.js";
 import { NetworkConfig } from "./lib/config.js";
 import { deployDApps } from "./lib/deploy.js";
 import { RootWallet } from "./lib/wallets.js";
 
-const { values } = parseArgs({
-  options: {
-    chain: {
-      type: "string",
-      default: "R",
-    },
-    config: {
-      type: "string",
-      default: "./config.json",
-    },
-    apply: {
-      type: "boolean",
-    },
-    "src-path": {
-      type: "string",
-      default: "./src/ride",
-    },
-    help: {
-      type: "boolean",
-      short: "h",
-    },
+const options = {
+  ...configOptions,
+  ...chainOptions,
+  "src-path": {
+    type: "string",
+    default: "./src/ride",
+    valueLabel: "path",
+    description: "Path to ride sources",
   },
-});
+  ...applyOptions,
+  ...helpOptions,
+} as const;
+
+const { values } = doOrExit(() => parseArgs({ options: options }), printHelp);
+
+function printHelp() {
+  console.log(`Usage:
+ ${getCommand()} [options]
+
+Deploys Ride scripts to wallets derived from the root wallet
+
+${formatOptions(options)}`);
+}
 
 if (values.help) {
-  console.log(
-    `Usage: ${process.argv[0]} ${process.argv[1]} [options]
-     --chain <id>        Chain ID (default: R)
-     --config <path>     Path to config file (default: ./config.json)
-     --src-path <path>   Path to ride sources (default: ./src/ride)
-     --apply             Actually submit the transactions
- -h, --help              Show this help message and exit`,
-  );
+  printHelp();
   process.exit(0);
 }
 
@@ -64,6 +66,6 @@ console.log(
       },
     },
     undefined,
-    "  ",
+    2,
   ),
 );
