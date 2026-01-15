@@ -114,6 +114,8 @@ node dist/wallet.js show --chain R
 
 ### Deploy Ride scripts
 
+In order, to test the oracle on a private node, deploy the dApps to it like this:
+
 ```sh
 node dist/deploy.js --config ./config.json --chain R --src-path ./src/ride --apply
 ```
@@ -158,11 +160,29 @@ On Waves blockchain a pool is identified by two things: the address of a dApp wi
 
 In case of private pools, the address is fixed, and Pool ID is the owner address.
 
+After registering an oracle, you can add it to `config.json` like this:
+
+```json
+  "pools": {
+    "<pool address base58>": {
+      "<pool ID base16>": {
+        "addresses": {
+          "<oracle Ethereum address>": {
+            "urls": ["<oracle-url>"]
+          }
+        }
+      }
+```
+
+Oracle Ethereum address can be obtained via `/address` endpoint of the Oracle API.
+
+Adding an oracle to `config.json` allows to omit `--oracle-url` option with some of the commands below.
+
 ### Register and list TD quotes. Manage attested pools
 
 There are also attested pools. Such a pool is defined by another fixed address and Pool ID is `quotesAddress || sha256(TD quote without Report Data)`.
 
-All oracles in an attested pools are guaranteed to have the same Intel TDX measurements.
+All oracles in an attested pool are guaranteed to have the same Intel TDX measurements.
 
 First, register a TD quote on-chain.
 
@@ -178,9 +198,11 @@ node dist/attestedPools.js add <oracle-url> --apply
 node dist/attestedPools.js list
 ```
 
+After registering an oracle, add it to `config.json`.
+
 ### Publish an oracle response
 
-Make a request to the oracle and publish the response on-chain:
+Make a request to the oracle and publish the response on-chain (uses the private pool by default):
 
 ```sh
 node --experimental-global-webcrypto dist/publish.js \
@@ -190,6 +212,7 @@ node --experimental-global-webcrypto dist/publish.js \
   -d '{"model":"gpt-5-nano","input":"What is the capital of France? Answer in one word."}' \
   -f '.output|map(.content//[])|add|map(.text//\"\")|add' \
   --output-request "chatgpt.txt" \
+  --oracle-url <oracle-url> \
   "https://api.openai.com/v1/responses" \
   "string" \
   --apply
@@ -200,7 +223,7 @@ Use `--experimental-global-webcrypto` on Node versions that do not expose WebCry
 Replay a stored request and publish the new response on-chain (it replaces the previous one):
 
 ```sh
-node --experimental-global-webcrypto dist/publish.js --from-file chatgpt.txt --apply
+node --experimental-global-webcrypto dist/publish.js --from-file chatgpt.txt --oracle-url <oracle-url> --apply
 ```
 
 ### View responses
@@ -217,7 +240,7 @@ Add a request:
 
 ```sh
 node --experimental-global-webcrypto dist/requests.js add \
-  --oracle-url http://localhost:8080 \
+  --oracle-url <oracle-url> \
   --pool-addr <pool-address> \
   --pool-id <pool-id> \
   --ttl 60 \
