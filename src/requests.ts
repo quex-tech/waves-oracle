@@ -106,10 +106,11 @@ ${formatOptions(options)}`);
   const network = await NetworkConfig.fromArgs(values.config, values.chain);
   const nodeUrl = network.getNodeUrl();
   for (const req of await fetchRequests(network.dApps.requests, nodeUrl)) {
+    const poolName = network.findDAppName(req.pool.address);
     console.log(`- Key:                ${req.key}
   Responses Address:  ${req.responsesAddress}
   Pool:
-    Address:          ${req.pool.address}
+    Address:          ${req.pool.address}${poolName ? ` (${poolName})` : ""}
     ID:               ${req.pool.formatId()}
   Action ID:          ${req.actionId.toString("hex")}
   Tx ID:              ${req.txId}

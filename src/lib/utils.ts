@@ -35,3 +35,7 @@ export function groupFieldsByKey(data: Record<string, DataTransactionEntry>) {
   }
   return res;
 }
+
+export function escapeRegExp(string: string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}

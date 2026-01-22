@@ -69,6 +69,11 @@ export class NetworkConfig {
     const config = addressPools[pool.id.toString("hex")];
     return new PoolConfig((config ?? { addresses: {} }).addresses);
   }
+
+  findDAppName(address: string) {
+    const entry = Object.entries(this.dApps).find((x) => x[1] == address);
+    return entry ? entry[0] : null;
+  }
 }
 
 class PoolConfig {
@@ -92,6 +97,7 @@ type JsonNetworkConfig = {
 
 type JsonDApps = {
   attestedPools: string;
+  attestedWhitelistPools: string;
   privatePools: string;
   quotes: string;
   requests: string;

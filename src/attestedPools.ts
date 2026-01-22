@@ -9,8 +9,8 @@ import {
   handleTx,
   helpOptions,
 } from "./cliUtils.js";
-import { addOracle, fetchOracles } from "./lib/attestedPools.js";
 import { NetworkConfig } from "./lib/config.js";
+import { AttestedOracle, fetchOracles as fetchOracle } from "./lib/oracles.js";
 import { SignerClient } from "./lib/signer.js";
 import { RootWallet } from "./lib/wallets.js";
 
@@ -89,15 +89,15 @@ ${formatOptions(options)}`);
   const nodeUrl = network.getNodeUrl();
 
   const quote = await new SignerClient(positionals[0]).quote();
+  const wallet = RootWallet.fromEnv();
+  const oracle = AttestedOracle.fromQuote(
+    quote,
+    network.dApps.quotes,
+    network.dApps.attestedPools,
+  );
 
   await handleTx(
-    addOracle(
-      network.dApps.quotes,
-      quote.getQuoteId(),
-      network.dApps.attestedPools,
-      network.chainId,
-      RootWallet.fromEnv(),
-    ),
+    oracle.add(quote.getQuoteId(), network.chainId, wallet),
     Boolean(values.apply),
     nodeUrl,
   );
@@ -136,10 +136,9 @@ ${formatOptions(options)}`);
   const network = await NetworkConfig.fromArgs(values.config, values.chain);
   const nodeUrl = network.getNodeUrl();
 
-  const attestedOracles = await fetchOracles(
-    network.dApps.attestedPools,
-    nodeUrl,
-  );
+  const attestedOracles = (
+    await fetchOracle(network.dApps.attestedPools, nodeUrl, null)
+  ).map((key) => AttestedOracle.parse(network.dApps.attestedPools, key));
   console.log(`Pool Address:    ${network.dApps.attestedPools}
 Oracles:`);
   for (const oracle of attestedOracles) {

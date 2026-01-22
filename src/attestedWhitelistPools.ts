@@ -1,3 +1,4 @@
+import { base58Encode } from "@waves/ts-lib-crypto";
 import { parseArgs } from "util";
 import {
   applyOptions,
@@ -11,8 +12,8 @@ import {
 } from "./cliUtils.js";
 import { NetworkConfig } from "./lib/config.js";
 import {
+  AttestedWhitelistOracle,
   fetchOracles as fetchOracleKeys,
-  PrivateOracle,
 } from "./lib/oracles.js";
 import { SignerClient } from "./lib/signer.js";
 import { escapeRegExp } from "./lib/utils.js";
@@ -24,13 +25,13 @@ function printRootHelp() {
   console.log(`Usage:
  ${getCommand()} <command>
 
-Manages oracles stored in the private pool on-chain
+Manages attested whitelisted oracles stored on-chain
 
 Positional arguments:
   command
-    add                 Add an oracle to the private pool
-    delete              Remove an oracle from the private pool
-    list                List private pool oracles`);
+    add                 Add an oracle to the attested whitelist pool
+    delete              Remove an oracle from the attested whitelist pool
+    list                List attested whitelisted oracles`);
 }
 
 switch (command) {
@@ -57,12 +58,6 @@ async function add(args: string[]) {
   const options = {
     ...configOptions,
     ...chainOptions,
-    "pool-id-suffix": {
-      type: "string",
-      default: "",
-      valueLabel: "hex",
-      description: "Optional pool ID suffix",
-    },
     ...applyOptions,
     ...helpOptions,
   } as const;
@@ -81,10 +76,10 @@ async function add(args: string[]) {
     console.log(`Usage:
  ${getCommand()} add [options] <oracle-url>
 
-Adds an oracle to the private pool
+Adds an oracle to the attested whitelist pool
 
 Positional arguments:
-  oracle-url                  Base URL of the oracle API
+  oracle-url            Base URL of the oracle API
 
 ${formatOptions(options)}`);
   }
@@ -93,7 +88,6 @@ ${formatOptions(options)}`);
     printHelp();
     process.exit(0);
   }
-
   if (!positionals[0]) {
     console.log("<oracle-url> is required");
     printHelp();
@@ -102,15 +96,23 @@ ${formatOptions(options)}`);
 
   const network = await NetworkConfig.fromArgs(values.config, values.chain);
   const nodeUrl = network.getNodeUrl();
+
+  const quote = await new SignerClient(positionals[0]).quote();
   const wallet = RootWallet.fromEnv();
-  const oracle = PrivateOracle.make(
-    network.dApps.privatePools,
-    Buffer.from(values["pool-id-suffix"], "hex"),
-    await new SignerClient(positionals[0]).publicKey(),
+  const oracle = AttestedWhitelistOracle.fromQuote(
+    quote,
     wallet.address(network.chainId),
+    network.dApps.quotes,
+    network.dApps.attestedWhitelistPools,
   );
+
   await handleTx(
-    oracle.add(network.chainId, wallet),
+    oracle.add(
+      quote.getQuoteId(),
+      network.dApps.quotes,
+      network.chainId,
+      wallet,
+    ),
     Boolean(values.apply),
     nodeUrl,
   );
@@ -120,12 +122,6 @@ async function del(args: string[]) {
   const options = {
     ...configOptions,
     ...chainOptions,
-    "pool-id-suffix": {
-      type: "string",
-      default: "",
-      valueLabel: "hex",
-      description: "Optional pool ID suffix",
-    },
     ...applyOptions,
     ...helpOptions,
   } as const;
@@ -144,7 +140,7 @@ async function del(args: string[]) {
     console.log(`Usage:
  ${getCommand()} delete [options] <oracle-url>
 
-Removes an oracle from the private pool
+Removes an oracle from the attested whitelist pool
 
 Positional arguments:
   oracle-url                  Base URL of the oracle API
@@ -166,12 +162,14 @@ ${formatOptions(options)}`);
   const network = await NetworkConfig.fromArgs(values.config, values.chain);
   const nodeUrl = network.getNodeUrl();
   const wallet = RootWallet.fromEnv();
-  const oracle = PrivateOracle.make(
-    network.dApps.privatePools,
-    Buffer.from(values["pool-id-suffix"], "hex"),
-    await new SignerClient(positionals[0]).publicKey(),
+  const quote = await new SignerClient(positionals[0]).quote();
+  const oracle = AttestedWhitelistOracle.fromQuote(
+    quote,
     wallet.address(network.chainId),
+    network.dApps.quotes,
+    network.dApps.attestedWhitelistPools,
   );
+
   await handleTx(
     oracle.delete(network.chainId, wallet),
     Boolean(values.apply),
@@ -203,7 +201,7 @@ async function list(args: string[]) {
     console.log(`Usage:
  ${getCommand()} list [options]
 
-Lists oracles stored in the private pool on-chain
+Lists attested whitelisted oracles stored on-chain
 
 ${formatOptions(options)}`);
   }
@@ -215,18 +213,22 @@ ${formatOptions(options)}`);
 
   const network = await NetworkConfig.fromArgs(values.config, values.chain);
   const nodeUrl = network.getNodeUrl();
+
   const ownerAddress = values.all
     ? null
     : RootWallet.fromEnv().address(values.chain);
   const match = ownerAddress ? `${escapeRegExp(ownerAddress)}:.*` : null;
-  const privateOracles = (
-    await fetchOracleKeys(network.dApps.privatePools, nodeUrl, match)
-  ).map((key) => PrivateOracle.parse(network.dApps.privatePools, key));
-  console.log(`Pool Address:    ${network.dApps.privatePools}
+  const attestedOracles = (
+    await fetchOracleKeys(network.dApps.attestedWhitelistPools, nodeUrl, match)
+  ).map((key) =>
+    AttestedWhitelistOracle.parse(network.dApps.attestedWhitelistPools, key),
+  );
+  console.log(`Pool Address:    ${network.dApps.attestedWhitelistPools}
 Oracles:`);
-  for (const oracle of privateOracles) {
-    console.log(`- Public Key:  ${oracle.publicKey.toString("hex")}
-  Pool ID:     ${oracle.pool.formatId()}
-  Owner:       ${oracle.ownerAddress}`);
+  for (const oracle of attestedOracles) {
+    console.log(`- Public Key:      ${oracle.publicKey.toString("hex")}
+  Pool ID:         ${oracle.pool.formatId()}
+  ID:              ${base58Encode(oracle.id)}
+  Owner Address:   ${oracle.ownerAddress}`);
   }
 }

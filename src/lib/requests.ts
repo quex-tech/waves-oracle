@@ -9,6 +9,7 @@ import {
   QuexResponse,
 } from "./models.js";
 import {
+  escapeRegExp,
   groupFieldsByKey,
   parseBinaryEntry,
   parseIntegerEntry,
@@ -189,8 +190,4 @@ function parseRequest(
     owner: base58Encode(parseBinaryEntry(req.owner)),
     reward: parseIntegerEntry(req.reward),
   };
-}
-
-function escapeRegExp(string: string) {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

@@ -38,9 +38,10 @@ for (const res of await fetchResponses(
   network.dApps.responses,
   network.getNodeUrl(),
 )) {
+  const poolName = network.findDAppName(res.pool.address);
   console.log(`- Action ID:  ${res.actionId.toString("hex")}
   Pool:
-    Address:  ${res.pool.address}
+    Address:  ${res.pool.address}${poolName ? ` (${poolName})` : ""}
     ID:       ${res.pool.formatId()}
   Timestamp:  ${new Date(res.dataItem.timestamp * 1000).toISOString()}
   Error:      ${res.dataItem.error}

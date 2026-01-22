@@ -11,6 +11,7 @@ import { RootWallet } from "./wallets.js";
 
 export type DApps = {
   attestedPools: string;
+  attestedWhitelistPools: string;
   privatePools: string;
   quotes: string;
   requests: string;
@@ -27,6 +28,7 @@ export function getDApps(wallet: RootWallet, chainId: string) {
 
   return {
     attestedPools: wallets.attestedPools.address(chainId),
+    attestedWhitelistPools: wallets.attestedWhitelistPools.address(chainId),
     privatePools: wallets.privatePools.address(chainId),
     quotes: wallets.quotes.address(chainId),
     requests: wallets.requests.address(chainId),
@@ -43,6 +45,10 @@ export async function* deployDApps(
   const scripts = {
     attestedPools: await compileRide(
       join(srcDirPath, "attested-pools.ride"),
+      nodeUrl,
+    ),
+    attestedWhitelistPools: await compileRide(
+      join(srcDirPath, "attested-whitelist-pools.ride"),
       nodeUrl,
     ),
     privatePools: await compileRide(
@@ -96,6 +102,7 @@ export async function* deployDApps(
 function getWallets(wallet: RootWallet) {
   return {
     attestedPools: wallet.derive(1),
+    attestedWhitelistPools: wallet.derive(6),
     privatePools: wallet.derive(2),
     quotes: wallet.derive(3),
     requests: wallet.derive(4),

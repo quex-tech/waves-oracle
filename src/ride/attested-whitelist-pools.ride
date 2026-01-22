@@ -1,0 +1,30 @@
+{-# STDLIB_VERSION 7 #-}
+{-# CONTENT_TYPE DAPP #-}
+{-# SCRIPT_TYPE ACCOUNT #-}
+
+@Callable(i)
+func isInPool(pk: ByteVector, poolId: ByteVector) = {
+  let present =
+    match getBoolean(this, toBase58String(take(poolId, 26)) + ":" + toBase58String(drop(poolId, 26)) + ":" + toBase58String(pk)) {
+      case b: Boolean => b
+      case _          => false
+    }
+
+  ([], present)
+}
+
+@Callable(i)
+func add(quotesAddr: ByteVector, quoteId: ByteVector) = [
+  let quote = getBinaryValue(Address(quotesAddr), toBase58String(quoteId) + ":quote")
+  let id = sha256_16Kb(quotesAddr + dropRight(drop(quote, 48), 64))
+  let pk = takeRight(quote, 64)
+  BooleanEntry(toBase58String(i.originCaller.bytes) + ":" + toBase58String(id) + ":" + toBase58String(pk), true)
+]
+
+@Callable(i)
+func delete(id: ByteVector, pk: ByteVector) = [
+  DeleteEntry(toBase58String(i.originCaller.bytes) + ":" + toBase58String(id) + ":" + toBase58String(pk))
+]
+
+@Verifier(tx)
+func verify() = false

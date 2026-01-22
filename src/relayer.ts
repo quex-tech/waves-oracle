@@ -29,7 +29,7 @@ const options = {
   },
   "min-reward": {
     type: "string",
-    default: "0.01",
+    default: "0.001",
     valueLabel: "waves",
     description: "Minimum reward in WAVES (excluding tx fee).",
   } as const,
@@ -66,6 +66,8 @@ const minRewardAmount = Math.round(minRewardWaves * wvs);
 
 const config = await Config.fromFile(values.config);
 
+const wallet = RootWallet.fromEnv();
+
 for (const chainId of values.chain) {
   const network = doOrExit(() => config.forChain(chainId), printHelp);
   const nodeUrl = network.findNodeUrl();
@@ -90,8 +92,6 @@ for (const chainId of values.chain) {
     }
 
     const signerClient = new SignerClient(oracleUrl);
-
-    const wallet = RootWallet.fromEnv();
 
     const res = await signerClient.query(
       req.action,
