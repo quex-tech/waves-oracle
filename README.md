@@ -52,6 +52,7 @@ Minimal structure:
       "nodeUrls": ["http://localhost:6869/"],
       "dApps": {
         "attestedPools": "<address>",
+        "attestedWhitelistPools": "<address>",
         "privatePools": "<address>",
         "quotes": "<address>",
         "requests": "<address>",
@@ -131,6 +132,7 @@ Example output:
   "R": {
     "dApps": {
       "attestedPools": "3MGqWUDyZuENhGUK7MqcavBbgtTgfMeDzUW",
+      "attestedWhitelistPools": "3M57LTpKfRqgMs9BQFbBge7sxNKFLWgEdbR",
       "privatePools": "3MJfAPuSQgQSB1AcUHHFzRUjMpx7j35YsQv",
       "quotes": "3M3hcSBqTF5SJxespKA13S6y6nFS9zA2eJX",
       "requests": "3M9KRgzrYgRNP6Ddg6V5mT1otM6fmURGN1T",
@@ -198,7 +200,19 @@ node dist/attestedPools.js add <oracle-url> --apply
 node dist/attestedPools.js list
 ```
 
-After registering an oracle, add it to `config.json`.
+### Manage attested whitelist pools
+
+Attested whitelist pools allow a pool owner to whitelist specific attested oracles. They combine features of private and attested pools.
+
+Pool ID is `ownerAddress || sha256(quotesAddress || TD quote without Report Data)`.
+
+Use these commands:
+
+```sh
+node dist/attestedWhitelistPools.js add <oracle-url> --apply
+node dist/attestedWhitelistPools.js delete <oracle-url> --apply
+node dist/attestedWhitelistPools.js list
+```
 
 ### Publish an oracle response
 
