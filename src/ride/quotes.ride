@@ -4,12 +4,89 @@
 
 let z32 = base16'0000000000000000000000000000000000000000000000000000000000000000'
 let rootCa = base64'MIICjzCCAjSgAwIBAgIUImUM1lqdNInzg7SVUr9QGzknBqwwCgYIKoZIzj0EAwIwaDEaMBgGA1UEAwwRSW50ZWwgU0dYIFJvb3QgQ0ExGjAYBgNVBAoMEUludGVsIENvcnBvcmF0aW9uMRQwEgYDVQQHDAtTYW50YSBDbGFyYTELMAkGA1UECAwCQ0ExCzAJBgNVBAYTAlVTMB4XDTE4MDUyMTEwNDUxMFoXDTQ5MTIzMTIzNTk1OVowaDEaMBgGA1UEAwwRSW50ZWwgU0dYIFJvb3QgQ0ExGjAYBgNVBAoMEUludGVsIENvcnBvcmF0aW9uMRQwEgYDVQQHDAtTYW50YSBDbGFyYTELMAkGA1UECAwCQ0ExCzAJBgNVBAYTAlVTMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEC6nEwMDIYZOj/iPWsCzaEKi71OiOSLRFhWGjbnBVJfVnkY4u3IjkDYYL0MxO4mqsyYjlBalTVYxFP2sJBK5zlKOBuzCBuDAfBgNVHSMEGDAWgBQiZQzWWp00ifODtJVSv1AbOScGrDBSBgNVHR8ESzBJMEegRaBDhkFodHRwczovL2NlcnRpZmljYXRlcy50cnVzdGVkc2VydmljZXMuaW50ZWwuY29tL0ludGVsU0dYUm9vdENBLmRlcjAdBgNVHQ4EFgQUImUM1lqdNInzg7SVUr9QGzknBqwwDgYDVR0PAQH/BAQDAgEGMBIGA1UdEwEB/wQIMAYBAf8CAQEwCgYIKoZIzj0EAwIDSQAwRgIhAOW/5QkR+S9CiSDcNoowLuPRLsWGf/Yi7GSX94BgwTwgAiEA4J0lrHoMs+Xo5o/sX6O9QWxHRAvZUGOdRQ7cvqRXaqI='
+let sgxOid = base16'2a864886f84d010d01'
+let steps10 = [0,1,2,3,4,5,6,7,8,9]
 
 func fetchBlobs(addr: Address, keys: List[String]) = {
   func step(acc: List[ByteVector], k: String) = {
     acc :+ getBinaryValue(addr, k)
   }
   FOLD<10>(keys, [], step)
+}
+
+func readUInt(buf: ByteVector, off: Int, len: Int) = {
+  toInt(toBigInt(base16'00' + drop(buf, off), 0, len + 1))
+}
+
+func readTL(buf: ByteVector, off: Int) = {
+  let l0 = readUInt(buf, off + 1, 1)
+  if l0 < 128 then (l0, off + 2)
+  else {
+    let n = l0 - 128
+    (readUInt(buf, off + 2, n), off + 2 + n)
+  }
+}
+
+func skipTLV(buf: ByteVector, off: Int) = {
+  let (l, o) = readTL(buf, off)
+  (o + l)
+}
+
+func skipIfTag(b: ByteVector, O: Int, t: Int) = {
+  if readUInt(b, O, 1) == t then skipTLV(b, O) else O
+}
+
+func parseExt(b: ByteVector, extO: Int) = {
+  let (extBodyL, extBodyO) = readTL(b, extO)
+  let (oidL, oidO) = readTL(b, extBodyO)
+  let oid = take(drop(b, oidO), oidL)
+
+  let afterOidO = skipTLV(b, extBodyO)
+  let afterCritO = skipIfTag(b, afterOidO, 1)
+
+  let (valL, valO) = readTL(b, afterCritO)
+  let val = take(drop(b, valO), valL)
+
+  (oid, val)
+}
+
+func getExt(cert: ByteVector, oid: ByteVector) = {
+  let (certL, certO) = readTL(cert, 0)
+  let (tbsL, tbsO) = readTL(cert, certO)
+
+  let afterVO = skipIfTag(cert, tbsO, 160)
+  let snO = skipIfTag(cert, afterVO, 2)
+  let sigO = skipIfTag(cert, snO, 48)
+  let issO = skipIfTag(cert, sigO, 48)
+  let valO = skipIfTag(cert, issO, 48)
+  let subO = skipIfTag(cert, valO, 48)
+  let spkO = skipIfTag(cert, subO, 48)
+
+  let iuO = skipIfTag(cert, skipIfTag(cert, spkO, 129), 161)
+  let suO = skipIfTag(cert, skipIfTag(cert, iuO, 130), 162)
+
+  if readUInt(cert, suO, 1) != 163 then base16''
+  else {
+    let (extWrapL, extWrapBodyO) = readTL(cert, suO)
+    let (extSeqL, extsO) = readTL(cert, extWrapBodyO)
+    let extEndO = extsO + extSeqL
+
+    func step(st: (Int, ByteVector), i: Int) = {
+      let (curO, v) = st
+      if v != base16'' then st
+      else {
+        if curO >= extEndO then st
+        else {
+          let (o, x) = parseExt(cert, curO)
+          if o == oid then (curO, x)
+          else (skipTLV(cert, curO), base16'')
+        }
+      }
+    }
+
+    let (curO, v) = FOLD<10>(steps10, (extsO, base16''), step)
+    v
+  }
 }
 
 @Callable(i)
@@ -28,18 +105,22 @@ func register(
   if !p256Verify(qeReport, qeReportSig, qePk) then
     throw("sig qe")
   else {
-    if sha256_16Kb(attestationKey + qeAuthData) + z32 != takeRight(qeReport, 64) then
-      throw("report-data")
+    if getExt(qeCertChain[0], sgxOid) == base16'' then
+      throw("non sgx")
     else {
-      let quoteId = sha256_16Kb(quote)
-      if !p256Verify(quote, quoteSig, attestationKey) then
-        throw("sig quote")
+      if sha256_16Kb(attestationKey + qeAuthData) + z32 != takeRight(qeReport, 64) then
+        throw("report-data")
       else {
-        let keyBase = toBase58String(sha256_16Kb(quote)) 
-        [
-          BinaryEntry(keyBase + ":quote", quote),
-          BinaryEntry(keyBase + ":qe-report", qeReport)
-        ]
+        let quoteId = sha256_16Kb(quote)
+        if !p256Verify(quote, quoteSig, attestationKey) then
+          throw("sig quote")
+        else {
+          let keyBase = toBase58String(sha256_16Kb(quote)) 
+          [
+            BinaryEntry(keyBase + ":quote", quote),
+            BinaryEntry(keyBase + ":qe-report", qeReport)
+          ]
+        }
       }
     }
   }
