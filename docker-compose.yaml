@@ -1,0 +1,17 @@
+services:
+  node:
+    image: ghcr.io/wavesplatform/waves-private-node:p256verify
+    ports:
+      - "6869:6869"
+    restart: unless-stopped
+
+  explorer:
+    image: wavesplatform/explorer
+    depends_on:
+      - node
+    environment:
+      API_NODE_URL: http://localhost:6869
+      NODE_LIST: http://localhost:6869
+    ports:
+      - "3000:8080"
+    restart: unless-stopped

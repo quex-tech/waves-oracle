@@ -91,16 +91,15 @@ ${formatOptions(options)}`);
   const network = await NetworkConfig.fromArgs(values.config, values.chain);
   const nodeUrl = network.getNodeUrl();
   const quote = await new SignerClient(oracleUrl).quote();
-  await handleTx(
-    registerQuote(
-      quote,
-      network.dApps.quotes,
-      network.chainId,
-      RootWallet.fromEnv().seed,
-    ),
-    Boolean(values.apply),
-    nodeUrl,
-  );
+  const wallet = RootWallet.fromEnv();
+  for await (const tx of registerQuote(
+    quote,
+    network.dApps.quotes,
+    network.chainId,
+    wallet,
+  )) {
+    await handleTx(tx, Boolean(values.apply), nodeUrl);
+  }
 }
 
 async function list(rest: string[]) {

@@ -1,9 +1,15 @@
-import { base58Decode } from "@waves/ts-lib-crypto";
+import {
+  CRLDistributionPointsExtension,
+  X509Certificate,
+} from "@peculiar/x509";
+import { base58Decode, base58Encode, sha256 } from "@waves/ts-lib-crypto";
 import { DataTransactionEntry } from "@waves/ts-types";
-import { invokeScript, TSeedTypes } from "@waves/waves-transactions";
+import { invokeScript } from "@waves/waves-transactions";
 import { accountData } from "@waves/waves-transactions/dist/nodeInteraction.js";
+import { saveBlobs } from "./blobs.js";
 import { QeReport, Quote, QuoteBody, QuoteHeader } from "./models.js";
 import { groupFieldsByKey, parseBinaryEntry } from "./utils.js";
+import { IWallet } from "./wallets.js";
 
 type QuoteEntry = {
   id: Buffer;
@@ -18,13 +24,24 @@ export async function fetchQuotes(address: string, nodeUrl: string) {
   );
 }
 
-export function registerQuote(
+export async function* registerQuote(
   quote: Quote,
   dApp: string,
   chainId: string,
-  seed: TSeedTypes,
+  wallet: IWallet,
 ) {
-  return invokeScript(
+  const crls = await fetchCrls(
+    quote.signatureData.qeCertificationData.certChain,
+  );
+
+  const crlsDict: Record<string, Buffer> = {};
+  for (const crl of crls) {
+    crlsDict[`crl:${base58Encode(Buffer.from(sha256(crl)))}`] = crl;
+  }
+
+  yield saveBlobs(crlsDict, chainId, wallet);
+
+  yield invokeScript(
     {
       dApp: dApp,
       call: {
@@ -67,19 +84,72 @@ export function registerQuote(
           },
           {
             type: "list",
-            value: quote.signatureData.qeCertificationData.certChain.map(
-              (x) => ({
+            value: quote.signatureData.qeCertificationData.certChain
+              .slice(
+                0,
+                quote.signatureData.qeCertificationData.certChain.length - 1,
+              )
+              .map((x) => ({
                 type: "binary",
                 value: x.toString("base64"),
-              }),
+              })),
+          },
+          {
+            type: "binary",
+            value: Buffer.from(base58Decode(wallet.address(chainId))).toString(
+              "base64",
             ),
+          },
+          {
+            type: "list",
+            value: Object.keys(crlsDict).map((x) => ({
+              type: "string",
+              value: x,
+            })),
           },
         ],
       },
       chainId: chainId,
     },
-    seed,
+    wallet.seed,
   );
+}
+
+async function fetchCrls(certs: X509Certificate[]): Promise<Buffer[]> {
+  const crlUrls = [...new Set(certs.flatMap(getCrlUrls))];
+  const crls: Buffer[] = [];
+
+  for (const url of crlUrls) {
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(
+        `Failed to fetch CRL from ${url}: ${res.status} ${res.statusText}`,
+      );
+    }
+
+    crls.push(Buffer.from(await res.arrayBuffer()));
+  }
+
+  return crls;
+}
+
+function getCrlUrls(cert: X509Certificate): string[] {
+  const ext = cert.getExtension(CRLDistributionPointsExtension);
+  if (!ext) return [];
+
+  const urls: string[] = [];
+
+  for (const dp of ext.distributionPoints ?? []) {
+    const fullName = dp.distributionPoint?.fullName;
+    if (!fullName) continue;
+
+    for (const gn of fullName) {
+      const uri = gn.uniformResourceIdentifier;
+      if (typeof uri === "string" && uri.length > 0) urls.push(uri);
+    }
+  }
+
+  return urls;
 }
 
 function parseQuote(

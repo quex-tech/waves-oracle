@@ -1,3 +1,4 @@
+import { PemConverter, X509Certificate } from "@peculiar/x509";
 import { base16Encode } from "@waves/ts-lib-crypto";
 import {
   DataItem,
@@ -226,7 +227,7 @@ function parseQuote(json: JsonQuote): Quote {
           json.quote_signature_data.qe_certification_data.certification_data
             .qe_authentication_data.data,
         ),
-        pemToDerList(
+        parsePemChain(
           b64(
             json.quote_signature_data.qe_certification_data.certification_data
               .qe_certification_data.certification_data,
@@ -275,22 +276,14 @@ function parseQuote(json: JsonQuote): Quote {
   );
 }
 
-function pemToDerList(pemChain: Buffer): Buffer[] {
-  const pemText = pemChain.toString("ascii");
+export function parsePemChain(pemChain: Buffer): X509Certificate[] {
+  const pem = pemChain.toString("utf8");
 
-  const pemCerts =
-    pemText.match(
-      /-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g,
-    ) ?? [];
+  const blocks = PemConverter.decodeWithHeaders(pem);
 
-  return pemCerts.map((pem) => {
-    return b64(
-      pem
-        .replace(/-----BEGIN CERTIFICATE-----/, "")
-        .replace(/-----END CERTIFICATE-----/, "")
-        .replace(/\s+/g, ""),
-    );
-  });
+  return blocks
+    .filter((b) => b.type === PemConverter.CertificateTag)
+    .map((b) => new X509Certificate(b.rawData));
 }
 
 function b64(str: string) {

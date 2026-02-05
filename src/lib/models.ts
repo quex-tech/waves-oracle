@@ -1,4 +1,5 @@
 import { getPublicKey } from "@noble/secp256k1";
+import { X509Certificate } from "@peculiar/x509";
 import {
   base58Decode,
   base58Encode,
@@ -631,7 +632,7 @@ export class QeCertificationData {
   constructor(
     public readonly type: number,
     public readonly authData: Buffer,
-    public readonly certChain: Buffer[],
+    public readonly certChain: X509Certificate[],
     public readonly report: QeReport,
     public readonly reportSignature: Buffer,
   ) {}

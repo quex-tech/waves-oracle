@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@noble/secp256k1": "^3.0.0",
+    "@peculiar/x509": "^1.14.3",
     "@waves/ts-lib-crypto": "^1.4.4",
     "@waves/waves-transactions": "^4.3.11"
   },
