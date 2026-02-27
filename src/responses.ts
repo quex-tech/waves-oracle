@@ -10,6 +10,8 @@ import {
 import { NetworkConfig } from "./lib/config.js";
 import { fetchResponses } from "./lib/responses.js";
 
+const utf8Decoder = new TextDecoder("utf-8", { fatal: true });
+
 const options = {
   ...configOptions,
   ...chainOptions,
@@ -39,11 +41,38 @@ for (const res of await fetchResponses(
   network.getNodeUrl(),
 )) {
   const poolName = network.findDAppName(res.pool.address);
-  console.log(`- Action ID:  ${res.actionId.toString("hex")}
+  console.log(`- Action ID:    ${res.actionId.toString("hex")}
   Pool:
-    Address:  ${res.pool.address}${poolName ? ` (${poolName})` : ""}
-    ID:       ${res.pool.formatId()}
-  Timestamp:  ${new Date(res.dataItem.timestamp * 1000).toISOString()}
-  Error:      ${res.dataItem.error}
-  Value:      ${res.dataItem.value.toString("hex")}`);
+    Address:    ${res.pool.address}${poolName ? ` (${poolName})` : ""}
+    ID:         ${res.pool.formatId()}
+  Timestamp:    ${new Date(res.dataItem.timestamp * 1000).toISOString()}
+  Error:        ${res.dataItem.error}
+  Value:        ${res.dataItem.value.toString("hex")}${prettyPrintValue(res.dataItem.value)}`);
+}
+
+function prettyPrintValue(value: Buffer): string {
+  if (value.length < 8) {
+    return "";
+  }
+
+  if (value.length === 8) {
+    return `\n  IntegerValue: ${value.readBigInt64BE(0).toString()}`;
+  }
+
+  const stringLength = value.readBigInt64BE(0);
+  if (stringLength < 0n || stringLength > BigInt(value.length - 8)) {
+    return "";
+  }
+
+  const stringLengthNumber = Number(stringLength);
+  if (stringLengthNumber + 8 === value.length) {
+    try {
+      const decoded = utf8Decoder.decode(value.subarray(8));
+      return `\n  StringValue:  ${decoded}`;
+    } catch {
+      return "";
+    }
+  }
+
+  return "";
 }
