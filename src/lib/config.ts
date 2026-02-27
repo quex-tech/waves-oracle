@@ -83,7 +83,7 @@ class PoolConfig {
     const urls =
       tdAddress == ANY_TD_ADDRESS
         ? Object.values(this.addresses).flatMap((x) => x.urls)
-        : this.addresses[tdAddress].urls;
+        : (this.addresses[tdAddress] || { urls: [] }).urls;
 
     return urls[Math.floor(Math.random() * urls.length)] ?? null;
   }

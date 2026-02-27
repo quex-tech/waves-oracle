@@ -93,12 +93,12 @@ for (const chainId of values.chain) {
 
     const signerClient = new SignerClient(oracleUrl);
 
-    const res = await signerClient.query(
-      req.action,
-      base58Decode(wallet.address(chainId)),
-    );
-
     try {
+      const res = await signerClient.query(
+        req.action,
+        base58Decode(wallet.address(chainId)),
+      );
+
       await handleTx(
         fulfillRequest(
           res,
