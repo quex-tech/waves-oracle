@@ -58,6 +58,13 @@
                 "urls": ["http://10.13.192.142:8080/"]
               }
             }
+          },
+          "01547edc166ac53b1359467af43257113f02054cd1f1ee0cad8ca3cb01b41eb43e63f7b74b9d00dd03f3552be75c13170e26dac6d6d4dc578ef4": {
+            "addresses": {
+              "0xAa3A4FB2Fee36B9cc7EF354Ae18a3fe0C6349542": {
+                "urls": ["http://10.13.192.6:8080/"]
+              }
+            }
           }
         }
       }
